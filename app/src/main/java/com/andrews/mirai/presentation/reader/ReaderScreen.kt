@@ -52,6 +52,9 @@ import com.andrews.mirai.presentation.reader.components.MiraiReaderImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.compose.runtime.snapshotFlow
+import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 private const val IMAGE_LOG_TAG = "MIRAI_IMAGE"
 private const val PRELOAD_DISTANCE = 3
@@ -89,6 +92,14 @@ fun ReaderScreen(
     }
 
     val listState = rememberLazyListState()
+
+    val progressStore = remember(applicationContext) {
+        ReadingProgressStore(applicationContext)
+    }
+
+    var positionRestored by remember(chapter.id) {
+        mutableStateOf(false)
+    }
 
     val currentPageIndex by remember {
         derivedStateOf {
@@ -148,6 +159,46 @@ fun ReaderScreen(
         }
 
         isLoading = false
+    }
+
+    LaunchedEffect(
+        chapter.id,
+        pages
+    ) {
+        if (
+            pages.isNotEmpty() &&
+            !positionRestored
+        ) {
+            val savedPage = progressStore
+                .getPage(chapter.id)
+                .coerceIn(
+                    minimumValue = 0,
+                    maximumValue = pages.lastIndex
+                )
+
+            listState.scrollToItem(savedPage)
+            positionRestored = true
+        }
+    }
+
+    LaunchedEffect(
+        chapter.id,
+        positionRestored
+    ) {
+        if (!positionRestored) {
+            return@LaunchedEffect
+        }
+
+        snapshotFlow {
+            listState.firstVisibleItemIndex
+        }
+            .distinctUntilChanged()
+            .collect { pageIndex ->
+                progressStore.savePage(
+                    chapterId = chapter.id,
+                    pageIndex = pageIndex
+                )
+            }
     }
 
     LaunchedEffect(

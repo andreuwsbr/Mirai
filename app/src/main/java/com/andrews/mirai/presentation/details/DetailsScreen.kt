@@ -29,13 +29,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
+import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -45,12 +48,22 @@ fun DetailsScreen(
     onBackClick: () -> Unit,
     onChapterClick: (Chapter) -> Unit
 ) {
+    val applicationContext = LocalContext.current.applicationContext
+
+    val progressStore = remember(applicationContext) {
+        ReadingProgressStore(applicationContext)
+    }
+
     var detailedManga by remember(manga.id) {
         mutableStateOf(manga)
     }
 
     var chapters by remember(manga.id) {
         mutableStateOf<List<Chapter>>(emptyList())
+    }
+
+    var viewedChapterIds by remember(manga.id) {
+        mutableStateOf<Set<String>>(emptySet())
     }
 
     var detailsLoading by remember(manga.id) {
@@ -94,6 +107,15 @@ fun DetailsScreen(
             }
         }.onSuccess { result ->
             chapters = result
+
+            viewedChapterIds = result
+                .filter { chapter ->
+                    progressStore.isViewed(chapter.id)
+                }
+                .map { chapter ->
+                    chapter.id
+                }
+                .toSet()
         }.onFailure { throwable ->
             chaptersError = throwable.message
                 ?: "Erro ao carregar os capítulos."
@@ -300,9 +322,17 @@ fun DetailsScreen(
             items = chapters,
             key = { chapter -> chapter.id }
         ) { chapter ->
+            val isViewed = chapter.id in viewedChapterIds
+
             ChapterItem(
                 chapter = chapter,
+                isViewed = isViewed,
                 onClick = {
+                    progressStore.markViewed(chapter.id)
+
+                    viewedChapterIds =
+                        viewedChapterIds + chapter.id
+
                     onChapterClick(chapter)
                 }
             )
@@ -319,11 +349,19 @@ fun DetailsScreen(
 @Composable
 private fun ChapterItem(
     chapter: Chapter,
+    isViewed: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .alpha(
+                if (isViewed) {
+                    0.55f
+                } else {
+                    1f
+                }
+            )
             .padding(
                 horizontal = 20.dp,
                 vertical = 5.dp
@@ -349,6 +387,18 @@ private fun ChapterItem(
                     text = chapter.uploadedAt,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isViewed) {
+                Spacer(
+                    modifier = Modifier.height(6.dp)
+                )
+
+                Text(
+                    text = "Visto",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
