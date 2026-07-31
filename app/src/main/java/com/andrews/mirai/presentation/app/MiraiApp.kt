@@ -89,7 +89,12 @@ fun MiraiApp() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(MiraiDestination.Home.route) {
-                HomeScreen()
+                HomeScreen(
+                    onMangaClick = { manga ->
+                        selectedManga = manga
+                        navController.navigate(DETAILS_ROUTE)
+                    }
+                )
             }
 
             composable(MiraiDestination.Catalog.route) {
