@@ -1,9 +1,7 @@
 package com.andrews.mirai.presentation.home.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,63 +10,73 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 
 @Composable
 fun ContinueReadingCard(
-    title: String = "Solo Leveling",
-    chapter: String = "Capítulo 178",
-    progress: Float = 0.81f,
-    onClick: () -> Unit = {}
+    title: String,
+    chapter: String,
+    coverUrl: String?,
+    currentPage: Int,
+    totalPages: Int,
+    onClick: () -> Unit
 ) {
+    val progress = if (totalPages > 0) {
+        (currentPage.toFloat() / totalPages.toFloat())
+            .coerceIn(0f, 1f)
+    } else {
+        0f
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
-            .clickable { onClick() },
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(22.dp),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 4.dp
         )
     ) {
-
         Row(
             modifier = Modifier.padding(18.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
-            Box(
+            AsyncImage(
+                model = coverUrl,
+                contentDescription = "Capa de $title",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(
                         width = 74.dp,
                         height = 108.dp
                     )
                     .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
             )
 
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-
                 Text(
                     text = "CONTINUE LENDO",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 Text(
                     text = title,
@@ -77,7 +85,9 @@ fun ContinueReadingCard(
                     maxLines = 2
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(
+                    modifier = Modifier.height(4.dp)
+                )
 
                 Text(
                     text = chapter,
@@ -85,17 +95,25 @@ fun ContinueReadingCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(
+                    modifier = Modifier.height(14.dp)
+                )
 
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
                 Text(
-                    text = "${(progress * 100).toInt()}% concluído",
+                    text = if (totalPages > 0) {
+                        "Página $currentPage de $totalPages"
+                    } else {
+                        "Página $currentPage"
+                    },
                     style = MaterialTheme.typography.labelMedium
                 )
             }

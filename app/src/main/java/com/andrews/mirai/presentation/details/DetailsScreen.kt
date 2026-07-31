@@ -330,6 +330,11 @@ fun DetailsScreen(
                 onClick = {
                     progressStore.markViewed(chapter.id)
 
+                    progressStore.registerReading(
+                        manga = detailedManga,
+                        chapter = chapter
+                    )
+
                     viewedChapterIds =
                         viewedChapterIds + chapter.id
 

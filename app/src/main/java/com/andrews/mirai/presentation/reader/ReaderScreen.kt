@@ -196,7 +196,8 @@ fun ReaderScreen(
             .collect { pageIndex ->
                 progressStore.savePage(
                     chapterId = chapter.id,
-                    pageIndex = pageIndex
+                    pageIndex = pageIndex,
+                    totalPages = pages.size
                 )
             }
     }

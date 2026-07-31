@@ -9,7 +9,6 @@ navigationCompose = "2.9.5"
 okhttp = "4.12.0"
 jsoup = "1.23.1"
 coil = "3.5.0"
-subsamplingScaleImageView = "66e0db195d"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,7 +29,6 @@ jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
-subsampling-scale-image-view = { group = "com.github.tachiyomiorg", name = "subsampling-scale-image-view", version.ref = "subsamplingScaleImageView" }
 
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }

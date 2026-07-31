@@ -93,6 +93,10 @@ fun MiraiApp() {
                     onMangaClick = { manga ->
                         selectedManga = manga
                         navController.navigate(DETAILS_ROUTE)
+                    },
+                    onContinueReadingClick = { chapter ->
+                        selectedChapter = chapter
+                        navController.navigate(READER_ROUTE)
                     }
                 )
             }

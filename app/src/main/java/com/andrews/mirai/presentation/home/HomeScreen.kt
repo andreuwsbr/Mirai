@@ -20,22 +20,33 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.andrews.mirai.data.repository.SourceRepository
+import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.presentation.components.MiraiHeader
+import com.andrews.mirai.presentation.home.components.ContinueReadingCard
 import com.andrews.mirai.presentation.home.components.HomeSearchBar
 import com.andrews.mirai.presentation.home.components.HomeSection
 import com.andrews.mirai.presentation.home.components.MangaHorizontalRow
+import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
 fun HomeScreen(
-    onMangaClick: (Manga) -> Unit = {}
+    onMangaClick: (Manga) -> Unit = {},
+    onContinueReadingClick: (Chapter) -> Unit = {}
 ) {
-    val source = SourceRepository.currentSource
+    val applicationContext =
+        LocalContext.current.applicationContext
+
+    val progressStore = remember(applicationContext) {
+        ReadingProgressStore(applicationContext)
+    }
+
     val listState = rememberLazyListState()
 
     var query by rememberSaveable {
@@ -57,6 +68,14 @@ fun HomeScreen(
     var reloadKey by remember {
         mutableIntStateOf(0)
     }
+
+    val source = SourceRepository.currentSource
+
+    val lastReading = progressStore
+        .getHistory()
+        .maxByOrNull { item ->
+            item.readAt
+        }
 
     LaunchedEffect(reloadKey) {
         loading = true
@@ -130,6 +149,29 @@ fun HomeScreen(
                     query = newQuery
                 }
             )
+        }
+
+        if (lastReading != null) {
+            item {
+                ContinueReadingCard(
+                    title = lastReading.mangaTitle,
+                    chapter = lastReading.chapterName,
+                    coverUrl = lastReading.mangaCoverUrl,
+                    currentPage = lastReading.pageIndex + 1,
+                    totalPages = lastReading.totalPages,
+                    onClick = {
+                        onContinueReadingClick(
+                            Chapter(
+                                id = lastReading.chapterId,
+                                mangaId = lastReading.mangaId,
+                                name = lastReading.chapterName,
+                                number = 0.0,
+                                url = lastReading.chapterId
+                            )
+                        )
+                    }
+                )
+            }
         }
 
         when {

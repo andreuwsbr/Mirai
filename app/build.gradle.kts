@@ -60,8 +60,6 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
-    implementation(libs.subsampling.scale.image.view)
-
     testImplementation(libs.junit)
 
     androidTestImplementation(libs.androidx.junit)
