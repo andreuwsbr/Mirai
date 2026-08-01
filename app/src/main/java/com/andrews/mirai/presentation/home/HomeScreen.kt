@@ -53,6 +53,10 @@ fun HomeScreen(
         mutableStateOf("")
     }
 
+    var searchExpanded by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     var mangas by remember {
         mutableStateOf<List<Manga>>(emptyList())
     }
@@ -94,6 +98,7 @@ fun HomeScreen(
             throw exception
         } catch (throwable: Throwable) {
             mangas = emptyList()
+
             errorMessage = throwable.message
                 ?: "Não foi possível carregar as obras."
         } finally {
@@ -123,32 +128,46 @@ fun HomeScreen(
         visibleMangas.take(8)
 
     val recentMangas =
-        visibleMangas.drop(8).take(8)
-            .ifEmpty { featuredMangas }
+        visibleMangas
+            .drop(8)
+            .take(8)
+            .ifEmpty {
+                featuredMangas
+            }
 
     val popularMangas =
-        visibleMangas.drop(16).take(8)
-            .ifEmpty { featuredMangas }
+        visibleMangas
+            .drop(16)
+            .take(8)
+            .ifEmpty {
+                featuredMangas
+            }
 
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
     ) {
         item {
             MiraiHeader(
-                title = "MIRAI",
-                subtitle = source.name
-            )
-        }
-
-        item {
-            HomeSearchBar(
-                value = query,
-                onValueChange = { newQuery ->
-                    query = newQuery
-                }
-            )
+                title = "MIRAI"
+            ) {
+                HomeSearchBar(
+                    value = query,
+                    onValueChange = { newQuery ->
+                        query = newQuery
+                    },
+                    expanded = searchExpanded,
+                    onExpand = {
+                        searchExpanded = true
+                    },
+                    onClose = {
+                        query = ""
+                        searchExpanded = false
+                    }
+                )
+            }
         }
 
         if (lastReading != null) {
@@ -157,8 +176,10 @@ fun HomeScreen(
                     title = lastReading.mangaTitle,
                     chapter = lastReading.chapterName,
                     coverUrl = lastReading.mangaCoverUrl,
-                    currentPage = lastReading.pageIndex + 1,
-                    totalPages = lastReading.totalPages,
+                    currentPage =
+                        lastReading.pageIndex + 1,
+                    totalPages =
+                        lastReading.totalPages,
                     onClick = {
                         onContinueReadingClick(
                             Chapter(
@@ -190,7 +211,9 @@ fun HomeScreen(
 
                         Text(
                             text = "Carregando obras...",
-                            modifier = Modifier.padding(top = 12.dp)
+                            modifier = Modifier.padding(
+                                top = 12.dp
+                            )
                         )
                     }
                 }
@@ -217,8 +240,9 @@ fun HomeScreen(
                             onClick = {
                                 reloadKey++
                             },
-                            modifier =
-                                Modifier.padding(top = 16.dp)
+                            modifier = Modifier.padding(
+                                top = 16.dp
+                            )
                         ) {
                             Text("Tentar novamente")
                         }
@@ -229,7 +253,8 @@ fun HomeScreen(
             visibleMangas.isEmpty() -> {
                 item {
                     Text(
-                        text = "Nenhuma obra encontrada para \"$normalizedQuery\".",
+                        text =
+                            "Nenhuma obra encontrada para \"$normalizedQuery\".",
                         modifier = Modifier.padding(20.dp)
                     )
                 }

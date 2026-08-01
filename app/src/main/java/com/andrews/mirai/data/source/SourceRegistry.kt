@@ -4,15 +4,23 @@ import com.andrews.mirai.data.source.mangalivre.MangaLivreSource
 
 object SourceRegistry {
 
-    private val sources: List<MangaSource> = listOf(
+    private val registeredSources: List<MangaSource> = listOf(
         MangaLivreSource()
     )
 
-    fun all(): List<MangaSource> = sources
+    fun all(): List<MangaSource> {
+        return registeredSources
+    }
 
-    fun byId(id: String): MangaSource? =
-        sources.firstOrNull { it.id == id }
+    fun default(): MangaSource {
+        return registeredSources.first()
+    }
 
-    fun default(): MangaSource =
-        sources.first()
+    fun findById(
+        sourceId: String
+    ): MangaSource? {
+        return registeredSources.firstOrNull { source ->
+            source.id == sourceId
+        }
+    }
 }

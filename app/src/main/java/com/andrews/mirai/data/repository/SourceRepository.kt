@@ -1,12 +1,21 @@
 package com.andrews.mirai.data.repository
 
 import com.andrews.mirai.data.source.MangaSource
-import com.andrews.mirai.data.source.mangalivre.MangaLivreSource
+import com.andrews.mirai.data.source.SourceRegistry
 
 object SourceRepository {
 
-    private val mangaLivreSource: MangaSource = MangaLivreSource()
+    val sources: List<MangaSource>
+        get() = SourceRegistry.all()
 
-    val currentSource: MangaSource
-        get() = mangaLivreSource
+    var currentSource: MangaSource =
+        SourceRegistry.default()
+
+    fun selectSource(sourceId: String): Boolean {
+        val source = SourceRegistry.findById(sourceId)
+            ?: return false
+
+        currentSource = source
+        return true
+    }
 }

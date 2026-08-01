@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -34,7 +36,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.andrews.mirai.data.local.FavoriteStore
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
@@ -48,7 +52,8 @@ fun DetailsScreen(
     onBackClick: () -> Unit,
     onChapterClick: (Chapter) -> Unit
 ) {
-    val applicationContext = LocalContext.current.applicationContext
+    val applicationContext =
+        LocalContext.current.applicationContext
 
     val progressStore = remember(applicationContext) {
         ReadingProgressStore(applicationContext)
@@ -56,6 +61,14 @@ fun DetailsScreen(
 
     var detailedManga by remember(manga.id) {
         mutableStateOf(manga)
+    }
+
+    val favorites by FavoriteStore
+        .favorites
+        .collectAsStateWithLifecycle()
+
+    val isFavorite = favorites.any { favorite ->
+        favorite.id == detailedManga.id
     }
 
     var chapters by remember(manga.id) {
@@ -128,17 +141,53 @@ fun DetailsScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         item {
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier.padding(
-                    start = 8.dp,
-                    top = 8.dp
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 8.dp,
+                        vertical = 8.dp
+                    ),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Voltar"
-                )
+                IconButton(
+                    onClick = onBackClick
+                ) {
+                    Icon(
+                        imageVector =
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Voltar"
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        FavoriteStore.toggleFavorite(
+                            detailedManga
+                        )
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) {
+                            Icons.Filled.Favorite
+                        } else {
+                            Icons.Outlined.FavoriteBorder
+                        },
+                        contentDescription =
+                            if (isFavorite) {
+                                "Remover dos favoritos"
+                            } else {
+                                "Adicionar aos favoritos"
+                            },
+                        tint = if (isFavorite) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme
+                                .onSurfaceVariant
+                        }
+                    )
+                }
             }
         }
 
@@ -160,7 +209,8 @@ fun DetailsScreen(
 
                 if (detailsError != null) {
                     Text(
-                        text = "Não foi possível carregar todos os detalhes.\n$detailsError",
+                        text =
+                            "Não foi possível carregar todos os detalhes.\n$detailsError",
                         color = MaterialTheme.colorScheme.error
                     )
 
@@ -171,16 +221,20 @@ fun DetailsScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
+                    horizontalArrangement =
+                        Arrangement.Start
                 ) {
                     AsyncImage(
                         model = detailedManga.coverUrl,
-                        contentDescription = "Capa de ${detailedManga.title}",
+                        contentDescription =
+                            "Capa de ${detailedManga.title}",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .width(140.dp)
                             .height(200.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(
+                                RoundedCornerShape(16.dp)
+                            )
                     )
 
                     Spacer(
@@ -190,7 +244,9 @@ fun DetailsScreen(
                     Column {
                         Text(
                             text = detailedManga.title,
-                            style = MaterialTheme.typography.headlineSmall
+                            style =
+                                MaterialTheme.typography
+                                    .headlineSmall
                         )
 
                         Spacer(
@@ -198,9 +254,14 @@ fun DetailsScreen(
                         )
 
                         Text(
-                            text = "Tipo: ${detailedManga.type.name}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text =
+                                "Tipo: ${detailedManga.type.name}",
+                            style =
+                                MaterialTheme.typography
+                                    .labelLarge,
+                            color =
+                                MaterialTheme.colorScheme
+                                    .onSurfaceVariant
                         )
 
                         Spacer(
@@ -208,8 +269,11 @@ fun DetailsScreen(
                         )
 
                         Text(
-                            text = "Autor: ${detailedManga.author}",
-                            style = MaterialTheme.typography.bodyMedium
+                            text =
+                                "Autor: ${detailedManga.author}",
+                            style =
+                                MaterialTheme.typography
+                                    .bodyMedium
                         )
 
                         Spacer(
@@ -217,8 +281,11 @@ fun DetailsScreen(
                         )
 
                         Text(
-                            text = "Status: ${detailedManga.status.name}",
-                            style = MaterialTheme.typography.bodyMedium
+                            text =
+                                "Status: ${detailedManga.status.name}",
+                            style =
+                                MaterialTheme.typography
+                                    .bodyMedium
                         )
                     }
                 }
@@ -250,7 +317,8 @@ fun DetailsScreen(
 
                     Text(
                         text = "Gêneros",
-                        style = MaterialTheme.typography.titleLarge
+                        style =
+                            MaterialTheme.typography.titleLarge
                     )
 
                     Spacer(
@@ -258,8 +326,12 @@ fun DetailsScreen(
                     )
 
                     Text(
-                        text = detailedManga.genres.joinToString(", "),
-                        style = MaterialTheme.typography.bodyMedium
+                        text =
+                            detailedManga.genres.joinToString(
+                                ", "
+                            ),
+                        style =
+                            MaterialTheme.typography.bodyMedium
                     )
                 }
 
@@ -282,11 +354,18 @@ fun DetailsScreen(
                     modifier = Modifier.height(4.dp)
                 )
 
-                if (!chaptersLoading && chapters.isNotEmpty()) {
+                if (
+                    !chaptersLoading &&
+                    chapters.isNotEmpty()
+                ) {
                     Text(
-                        text = "${chapters.size} capítulos encontrados",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text =
+                            "${chapters.size} capítulos encontrados",
+                        style =
+                            MaterialTheme.typography.bodySmall,
+                        color =
+                            MaterialTheme.colorScheme
+                                .onSurfaceVariant
                     )
                 }
 
@@ -301,7 +380,8 @@ fun DetailsScreen(
                 if (chaptersError != null) {
                     Text(
                         text = chaptersError!!,
-                        color = MaterialTheme.colorScheme.error
+                        color =
+                            MaterialTheme.colorScheme.error
                     )
                 }
 
@@ -311,8 +391,11 @@ fun DetailsScreen(
                     chapters.isEmpty()
                 ) {
                     Text(
-                        text = "Nenhum capítulo foi encontrado.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text =
+                            "Nenhum capítulo foi encontrado.",
+                        color =
+                            MaterialTheme.colorScheme
+                                .onSurfaceVariant
                     )
                 }
             }
@@ -320,15 +403,20 @@ fun DetailsScreen(
 
         items(
             items = chapters,
-            key = { chapter -> chapter.id }
+            key = { chapter ->
+                chapter.id
+            }
         ) { chapter ->
-            val isViewed = chapter.id in viewedChapterIds
+            val isViewed =
+                chapter.id in viewedChapterIds
 
             ChapterItem(
                 chapter = chapter,
                 isViewed = isViewed,
                 onClick = {
-                    progressStore.markViewed(chapter.id)
+                    progressStore.markViewed(
+                        chapter.id
+                    )
 
                     progressStore.registerReading(
                         manga = detailedManga,
@@ -380,7 +468,8 @@ private fun ChapterItem(
         ) {
             Text(
                 text = chapter.name,
-                style = MaterialTheme.typography.titleMedium
+                style =
+                    MaterialTheme.typography.titleMedium
             )
 
             if (chapter.uploadedAt.isNotBlank()) {
@@ -390,8 +479,11 @@ private fun ChapterItem(
 
                 Text(
                     text = chapter.uploadedAt,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        MaterialTheme.colorScheme
+                            .onSurfaceVariant
                 )
             }
 
@@ -402,8 +494,10 @@ private fun ChapterItem(
 
                 Text(
                     text = "Visto",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    style =
+                        MaterialTheme.typography.labelMedium,
+                    color =
+                        MaterialTheme.colorScheme.primary
                 )
             }
         }

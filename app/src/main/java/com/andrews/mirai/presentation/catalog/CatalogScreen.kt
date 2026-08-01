@@ -30,6 +30,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import com.andrews.mirai.data.source.SourceRegistry
+import com.andrews.mirai.presentation.catalog.components.SourceSelector
+import com.andrews.mirai.presentation.catalog.components.ExpandableSearchBar
 
 private const val SEARCH_DELAY_MILLIS = 500L
 
@@ -39,6 +42,9 @@ fun CatalogScreen(
 ) {
     var query by remember {
         mutableStateOf("")
+    }
+    var selectedSource by remember {
+        mutableStateOf(SourceRepository.currentSource)
     }
 
     var mangas by remember {
@@ -53,7 +59,7 @@ fun CatalogScreen(
         mutableStateOf<String?>(null)
     }
 
-    LaunchedEffect(query) {
+    LaunchedEffect(query, selectedSource) {
         val normalizedQuery = query.trim()
 
         loading = true
@@ -66,11 +72,11 @@ fun CatalogScreen(
         try {
             val result = withContext(Dispatchers.IO) {
                 if (normalizedQuery.isBlank()) {
-                    SourceRepository.currentSource.getPopular(
+                    selectedSource.getPopular(
                         page = 1
                     )
                 } else {
-                    SourceRepository.currentSource.search(
+                    selectedSource.search(
                         query = normalizedQuery,
                         page = 1
                     )
@@ -95,24 +101,36 @@ fun CatalogScreen(
     ) {
         MiraiHeader(
             title = "Catálogo",
-            subtitle = SourceRepository.currentSource.name
+            subtitle = "Escolha uma fonte"
         )
 
-        OutlinedTextField(
+        SourceSelector(
+
+            sources = SourceRepository.sources,
+
+            selectedSource = selectedSource,
+
+            onSourceSelected = {
+
+                selectedSource = it
+
+                SourceRepository.currentSource = it
+
+                query = ""
+            }
+
+        )
+
+        ExpandableSearchBar(
+
             value = query,
-            onValueChange = { newQuery ->
-                query = newQuery
-            },
-            label = {
-                Text("Pesquisar na fonte")
-            },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = 20.dp,
-                    vertical = 12.dp
-                )
+
+            onValueChange = {
+
+                query = it
+
+            }
+
         )
 
         when {

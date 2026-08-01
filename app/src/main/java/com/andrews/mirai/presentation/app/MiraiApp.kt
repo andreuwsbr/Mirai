@@ -13,10 +13,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.andrews.mirai.data.local.FavoriteStore
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.navigation.MiraiDestination
@@ -25,15 +27,24 @@ import com.andrews.mirai.presentation.details.DetailsScreen
 import com.andrews.mirai.presentation.history.HistoryScreen
 import com.andrews.mirai.presentation.home.HomeScreen
 import com.andrews.mirai.presentation.library.LibraryScreen
-import com.andrews.mirai.presentation.networktest.NetworkTestScreen
 import com.andrews.mirai.presentation.reader.ReaderScreen
+import com.andrews.mirai.presentation.settings.SettingsScreen
 
 private const val DETAILS_ROUTE = "details"
 private const val READER_ROUTE = "reader"
 
 @Composable
 fun MiraiApp() {
-    val navController = rememberNavController()
+    val context =
+        LocalContext.current.applicationContext
+
+    remember(context) {
+        FavoriteStore.initialize(context)
+        true
+    }
+
+    val navController =
+        rememberNavController()
 
     var selectedManga by remember {
         mutableStateOf<Manga?>(null)
@@ -43,8 +54,11 @@ fun MiraiApp() {
         mutableStateOf<Chapter?>(null)
     }
 
-    val backStack by navController.currentBackStackEntryAsState()
-    val currentRoute = backStack?.destination?.route
+    val backStack by
+    navController.currentBackStackEntryAsState()
+
+    val currentRoute =
+        backStack?.destination?.route
 
     val showBottomBar =
         currentRoute != DETAILS_ROUTE &&
@@ -54,72 +68,115 @@ fun MiraiApp() {
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {
-                    MiraiDestination.bottomItems.forEach { destination ->
-                        NavigationBarItem(
-                            selected = currentRoute == destination.route,
-                            onClick = {
-                                navController.navigate(destination.route) {
-                                    popUpTo(MiraiDestination.Home.route) {
-                                        saveState = true
-                                    }
+                    MiraiDestination.bottomItems
+                        .forEach { destination ->
+                            NavigationBarItem(
+                                selected =
+                                    currentRoute ==
+                                            destination.route,
+                                onClick = {
+                                    navController.navigate(
+                                        destination.route
+                                    ) {
+                                        popUpTo(
+                                            MiraiDestination
+                                                .Home
+                                                .route
+                                        ) {
+                                            saveState = true
+                                        }
 
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = destination.icon,
-                                    contentDescription = destination.label
-                                )
-                            },
-                            label = {
-                                Text(destination.label)
-                            },
-                            colors = NavigationBarItemDefaults.colors()
-                        )
-                    }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector =
+                                            destination.icon,
+                                        contentDescription =
+                                            destination.label
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        destination.label
+                                    )
+                                },
+                                colors =
+                                    NavigationBarItemDefaults
+                                        .colors()
+                            )
+                        }
                 }
             }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = MiraiDestination.Home.route,
+            startDestination =
+                MiraiDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(MiraiDestination.Home.route) {
+            composable(
+                MiraiDestination.Home.route
+            ) {
                 HomeScreen(
                     onMangaClick = { manga ->
                         selectedManga = manga
-                        navController.navigate(DETAILS_ROUTE)
+
+                        navController.navigate(
+                            DETAILS_ROUTE
+                        )
                     },
                     onContinueReadingClick = { chapter ->
                         selectedChapter = chapter
-                        navController.navigate(READER_ROUTE)
+
+                        navController.navigate(
+                            READER_ROUTE
+                        )
                     }
                 )
             }
 
-            composable(MiraiDestination.Catalog.route) {
+            composable(
+                MiraiDestination.Catalog.route
+            ) {
                 CatalogScreen(
                     onMangaClick = { manga ->
                         selectedManga = manga
-                        navController.navigate(DETAILS_ROUTE)
+
+                        navController.navigate(
+                            DETAILS_ROUTE
+                        )
                     }
                 )
             }
 
-            composable(MiraiDestination.Library.route) {
-                LibraryScreen()
+            composable(
+                MiraiDestination.Library.route
+            ) {
+                LibraryScreen(
+                    onMangaClick = { manga ->
+                        selectedManga = manga
+
+                        navController.navigate(
+                            DETAILS_ROUTE
+                        )
+                    }
+                )
             }
 
-            composable(MiraiDestination.History.route) {
+            composable(
+                MiraiDestination.History.route
+            ) {
                 HistoryScreen()
             }
 
-            composable(MiraiDestination.Settings.route) {
-                NetworkTestScreen()
+            composable(
+                MiraiDestination.Settings.route
+            ) {
+                SettingsScreen()
             }
 
             composable(DETAILS_ROUTE) {
@@ -133,11 +190,16 @@ fun MiraiApp() {
                         },
                         onChapterClick = { chapter ->
                             selectedChapter = chapter
-                            navController.navigate(READER_ROUTE)
+
+                            navController.navigate(
+                                READER_ROUTE
+                            )
                         }
                     )
                 } else {
-                    Text("Não foi possível carregar a obra.")
+                    Text(
+                        "Não foi possível carregar a obra."
+                    )
                 }
             }
 
@@ -152,7 +214,9 @@ fun MiraiApp() {
                         }
                     )
                 } else {
-                    Text("Não foi possível carregar o capítulo.")
+                    Text(
+                        "Não foi possível carregar o capítulo."
+                    )
                 }
             }
         }

@@ -1,60 +1,56 @@
 package com.andrews.mirai.presentation.reader
 
-import android.graphics.BitmapFactory
-import android.net.Uri
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageCache
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
-import com.andrews.mirai.presentation.reader.components.MiraiReaderImage
+import com.andrews.mirai.presentation.reader.components.ReaderBottomBar
+import com.andrews.mirai.presentation.reader.components.ReaderErrorContent
+import com.andrews.mirai.presentation.reader.components.ReaderLoadingContent
+import com.andrews.mirai.presentation.reader.components.ReaderTopBar
+import com.andrews.mirai.presentation.reader.mode.HorizontalPagedReader
+import com.andrews.mirai.presentation.reader.mode.LongStripReader
+import com.andrews.mirai.presentation.reader.mode.VerticalPagedReader
+import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
+import com.andrews.mirai.presentation.reader.settings.ReaderBackground
+import com.andrews.mirai.presentation.reader.settings.ReaderMode
+import com.andrews.mirai.presentation.reader.settings.ReaderSettingsSheet
+import com.andrews.mirai.presentation.reader.settings.ReaderSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
-import androidx.compose.runtime.snapshotFlow
-import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
-import kotlinx.coroutines.flow.distinctUntilChanged
 
 private const val IMAGE_LOG_TAG = "MIRAI_IMAGE"
 private const val PRELOAD_DISTANCE = 3
@@ -64,6 +60,34 @@ fun ReaderScreen(
     chapter: Chapter,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val applicationContext = context.applicationContext
+    val view = LocalView.current
+
+    val activity = remember(context) {
+        context.findActivity()
+    }
+
+    val progressStore = remember(applicationContext) {
+        ReadingProgressStore(applicationContext)
+    }
+
+    val settingsStore = remember(applicationContext) {
+        ReaderSettingsStore(applicationContext)
+    }
+
+    val imageCache = remember(applicationContext) {
+        ReaderImageCache(applicationContext)
+    }
+
+    val imageDownloader = remember(imageCache) {
+        ReaderImageDownloader(imageCache)
+    }
+
+    var preferences by remember {
+        mutableStateOf(settingsStore.load())
+    }
+
     var pages by remember(chapter.id) {
         mutableStateOf<List<ReaderPage>>(emptyList())
     }
@@ -76,51 +100,119 @@ fun ReaderScreen(
         mutableStateOf<String?>(null)
     }
 
-    var controlsVisible by remember {
+    var controlsVisible by remember(chapter.id) {
         mutableStateOf(true)
     }
 
-    val applicationContext =
-        LocalContext.current.applicationContext
-
-    val imageCache = remember(applicationContext) {
-        ReaderImageCache(applicationContext)
-    }
-
-    val imageDownloader = remember(imageCache) {
-        ReaderImageDownloader(imageCache)
-    }
-
-    val listState = rememberLazyListState()
-
-    val progressStore = remember(applicationContext) {
-        ReadingProgressStore(applicationContext)
-    }
-
-    var positionRestored by remember(chapter.id) {
+    var settingsVisible by remember {
         mutableStateOf(false)
     }
 
-    val currentPageIndex by remember {
-        derivedStateOf {
-            if (pages.isEmpty()) {
-                0
+    var currentPageIndex by remember(chapter.id) {
+        mutableIntStateOf(
+            progressStore.getPage(chapter.id)
+        )
+    }
+
+    var requestedPage by remember {
+        mutableStateOf<Int?>(null)
+    }
+
+    val backgroundColor = when (preferences.background) {
+        ReaderBackground.BLACK -> Color.Black
+        ReaderBackground.GRAY -> Color(0xFF444444)
+        ReaderBackground.WHITE -> Color.White
+    }
+
+    val foregroundColor =
+        if (preferences.background == ReaderBackground.WHITE) {
+            Color.Black
+        } else {
+            Color.White
+        }
+
+    DisposableEffect(
+        preferences.keepScreenOn,
+        view
+    ) {
+        val previousKeepScreenOn = view.keepScreenOn
+
+        view.keepScreenOn =
+            preferences.keepScreenOn
+
+        onDispose {
+            view.keepScreenOn =
+                previousKeepScreenOn
+        }
+    }
+
+    DisposableEffect(
+        preferences.fullscreen,
+        activity
+    ) {
+        val window = activity?.window
+
+        if (window != null) {
+            val controller =
+                WindowCompat.getInsetsController(
+                    window,
+                    window.decorView
+                )
+
+            if (preferences.fullscreen) {
+                WindowCompat.setDecorFitsSystemWindows(
+                    window,
+                    false
+                )
+
+                controller.hide(
+                    WindowInsetsCompat.Type.systemBars()
+                )
+
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat
+                        .BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             } else {
-                listState.firstVisibleItemIndex
-                    .coerceIn(0, pages.lastIndex)
+                WindowCompat.setDecorFitsSystemWindows(
+                    window,
+                    true
+                )
+
+                controller.show(
+                    WindowInsetsCompat.Type.systemBars()
+                )
+            }
+        }
+
+        onDispose {
+            if (window != null) {
+                WindowCompat.setDecorFitsSystemWindows(
+                    window,
+                    true
+                )
+
+                WindowCompat
+                    .getInsetsController(
+                        window,
+                        window.decorView
+                    )
+                    .show(
+                        WindowInsetsCompat.Type.systemBars()
+                    )
             }
         }
     }
 
-    val readingProgress by remember {
-        derivedStateOf {
-            if (pages.isEmpty()) {
-                0f
-            } else {
-                ((currentPageIndex + 1).toFloat() / pages.size.toFloat())
-                    .coerceIn(0f, 1f)
-            }
+    BackHandler {
+        if (settingsVisible) {
+            settingsVisible = false
+        } else {
+            onBackClick()
         }
+    }
+
+    LaunchedEffect(preferences) {
+        settingsStore.save(preferences)
     }
 
     LaunchedEffect(chapter.id) {
@@ -130,30 +222,32 @@ fun ReaderScreen(
 
         runCatching {
             withContext(Dispatchers.IO) {
-                SourceRepository.currentSource.getPages(chapter)
+                SourceRepository.currentSource.getPages(
+                    chapter = chapter
+                )
             }
         }.onSuccess { result ->
             pages = result
 
+            currentPageIndex =
+                currentPageIndex.coerceIn(
+                    minimumValue = 0,
+                    maximumValue =
+                        result.lastIndex.coerceAtLeast(0)
+                )
+
             Log.d(
                 IMAGE_LOG_TAG,
-                "Capítulo: ${chapter.name} | " +
-                        "Total de páginas: ${result.size}"
+                "${chapter.name}: ${result.size} páginas"
             )
-
-            result.forEach { page ->
-                Log.d(
-                    IMAGE_LOG_TAG,
-                    "Página ${page.index + 1}: ${page.imageUrl}"
-                )
-            }
         }.onFailure { throwable ->
-            errorMessage = throwable.message
-                ?: "Não foi possível carregar as páginas."
+            errorMessage =
+                throwable.message
+                    ?: "Não foi possível carregar as páginas."
 
             Log.e(
                 IMAGE_LOG_TAG,
-                "Erro ao carregar páginas de ${chapter.name}",
+                "Erro ao carregar ${chapter.name}",
                 throwable
             )
         }
@@ -163,43 +257,20 @@ fun ReaderScreen(
 
     LaunchedEffect(
         chapter.id,
-        pages
+        currentPageIndex,
+        pages.size
     ) {
-        if (
-            pages.isNotEmpty() &&
-            !positionRestored
-        ) {
-            val savedPage = progressStore
-                .getPage(chapter.id)
-                .coerceIn(
-                    minimumValue = 0,
-                    maximumValue = pages.lastIndex
-                )
-
-            listState.scrollToItem(savedPage)
-            positionRestored = true
+        if (pages.isNotEmpty()) {
+            progressStore.savePage(
+                chapterId = chapter.id,
+                pageIndex =
+                    currentPageIndex.coerceIn(
+                        minimumValue = 0,
+                        maximumValue = pages.lastIndex
+                    ),
+                totalPages = pages.size
+            )
         }
-    }
-
-    LaunchedEffect(
-        chapter.id,
-        positionRestored
-    ) {
-        if (!positionRestored) {
-            return@LaunchedEffect
-        }
-
-        snapshotFlow {
-            listState.firstVisibleItemIndex
-        }
-            .distinctUntilChanged()
-            .collect { pageIndex ->
-                progressStore.savePage(
-                    chapterId = chapter.id,
-                    pageIndex = pageIndex,
-                    totalPages = pages.size
-                )
-            }
     }
 
     LaunchedEffect(
@@ -211,39 +282,21 @@ fun ReaderScreen(
             return@LaunchedEffect
         }
 
-        val firstPageToPreload = currentPageIndex + 1
+        val startIndex =
+            (currentPageIndex + 1)
+                .coerceAtMost(pages.lastIndex)
 
-        val lastPageToPreload = (
-                currentPageIndex + PRELOAD_DISTANCE
-                ).coerceAtMost(pages.lastIndex)
+        val endIndex =
+            (currentPageIndex + PRELOAD_DISTANCE)
+                .coerceAtMost(pages.lastIndex)
 
-        if (firstPageToPreload > lastPageToPreload) {
-            return@LaunchedEffect
-        }
-
-        for (
-        pageIndex in firstPageToPreload..lastPageToPreload
-        ) {
-            val page = pages[pageIndex]
-
-            runCatching {
-                imageDownloader.download(
-                    imageUrl = page.imageUrl
-                )
-            }.onSuccess { file ->
-                Log.d(
-                    IMAGE_LOG_TAG,
-                    "PRÉ-CARREGADA | " +
-                            "Página ${page.index + 1} | " +
-                            "${file.length()} bytes"
-                )
-            }.onFailure { throwable ->
-                Log.e(
-                    IMAGE_LOG_TAG,
-                    "ERRO NO PRÉ-CARREGAMENTO | " +
-                            "Página ${page.index + 1}",
-                    throwable
-                )
+        if (startIndex <= endIndex) {
+            for (index in startIndex..endIndex) {
+                runCatching {
+                    imageDownloader.download(
+                        pages[index].imageUrl
+                    )
+                }
             }
         }
     }
@@ -251,30 +304,16 @@ fun ReaderScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = {
-                        controlsVisible = !controlsVisible
-                    }
-                )
-            }
+            .background(backgroundColor)
     ) {
         when {
             isLoading -> {
-                LoadingContent(
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                ReaderLoadingContent()
             }
 
             errorMessage != null -> {
-                Text(
-                    text = errorMessage!!,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(24.dp),
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
+                ReaderErrorContent(
+                    message = errorMessage!!
                 )
             }
 
@@ -284,281 +323,170 @@ fun ReaderScreen(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(24.dp),
-                    color = Color.White,
+                    color = foregroundColor,
+                    style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center
                 )
             }
 
             else -> {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(
-                        items = pages,
-                        key = { page ->
-                            "${page.index}-${page.imageUrl}"
-                        }
-                    ) { page ->
-                        ReaderPageContent(
-                            page = page,
-                            imageDownloader = imageDownloader
-                        )
+                ReaderModeContent(
+                    pages = pages,
+                    mode = preferences.mode,
+                    longStripGapDp =
+                        preferences.longStripGapDp,
+                    initialPage =
+                        currentPageIndex,
+                    requestedPage =
+                        requestedPage,
+                    imageDownloader =
+                        imageDownloader,
+                    backgroundColor =
+                        backgroundColor,
+                    onPageChanged = { pageIndex ->
+                        currentPageIndex = pageIndex
+                    },
+                    onRequestedPageConsumed = {
+                        requestedPage = null
+                    },
+                    onTap = {
+                        controlsVisible =
+                            !controlsVisible
                     }
-                }
+                )
             }
         }
 
         AnimatedVisibility(
-            visible = controlsVisible,
+            visible =
+                controlsVisible &&
+                        !settingsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(
+                Alignment.TopCenter
+            )
         ) {
             ReaderTopBar(
                 chapterName = chapter.name,
-                currentPage = currentPageIndex + 1,
+                currentPage =
+                    currentPageIndex + 1,
                 totalPages = pages.size,
-                progress = readingProgress,
+                showPageNumber =
+                    preferences.showPageNumber,
                 onBackClick = onBackClick
             )
         }
-    }
-}
 
-@Composable
-private fun ReaderPageContent(
-    page: ReaderPage,
-    imageDownloader: ReaderImageDownloader
-) {
-    var imageFile by remember(page.imageUrl) {
-        mutableStateOf<File?>(null)
-    }
-
-    var imageAspectRatio by remember(page.imageUrl) {
-        mutableStateOf<Float?>(null)
-    }
-
-    var isDownloading by remember(page.imageUrl) {
-        mutableStateOf(true)
-    }
-
-    var downloadError by remember(page.imageUrl) {
-        mutableStateOf<String?>(null)
-    }
-
-    LaunchedEffect(page.imageUrl) {
-        isDownloading = true
-        downloadError = null
-        imageFile = null
-        imageAspectRatio = null
-
-        runCatching {
-            val downloadedFile = imageDownloader.download(
-                imageUrl = page.imageUrl
+        AnimatedVisibility(
+            visible =
+                controlsVisible &&
+                        !settingsVisible &&
+                        pages.isNotEmpty(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(
+                Alignment.BottomCenter
             )
-
-            val dimensions = readImageDimensions(
-                downloadedFile
-            )
-
-            downloadedFile to dimensions
-        }.onSuccess { result ->
-            val downloadedFile = result.first
-            val dimensions = result.second
-
-            imageFile = downloadedFile
-            imageAspectRatio = dimensions
-
-            Log.d(
-                IMAGE_LOG_TAG,
-                "ARQUIVO LOCAL | " +
-                        "Página ${page.index + 1} | " +
-                        "Tamanho: ${downloadedFile.length()} bytes | " +
-                        "Proporção: $dimensions | " +
-                        "Arquivo: ${downloadedFile.absolutePath}"
-            )
-        }.onFailure { throwable ->
-            downloadError = throwable.message
-                ?: "Não foi possível baixar esta página."
-
-            Log.e(
-                IMAGE_LOG_TAG,
-                "ERRO NO DOWNLOAD | " +
-                        "Página ${page.index + 1} | " +
-                        "URL: ${page.imageUrl}",
-                throwable
-            )
-        }
-
-        isDownloading = false
-    }
-
-    when {
-        isDownloading -> {
-            PageLoadingContent(
-                pageNumber = page.index + 1
-            )
-        }
-
-        downloadError != null -> {
-            Text(
-                text = "Erro na página ${page.index + 1}\n" +
-                        downloadError,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 220.dp)
-                    .padding(24.dp),
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center
-            )
-        }
-
-        imageFile != null &&
-                imageAspectRatio != null -> {
-
-            MiraiReaderImage(
-                imageFileUri = Uri.fromFile(imageFile),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(imageAspectRatio!!)
-            )
-        }
-    }
-}
-
-private suspend fun readImageDimensions(
-    imageFile: File
-): Float = withContext(Dispatchers.IO) {
-    val options = BitmapFactory.Options().apply {
-        inJustDecodeBounds = true
-    }
-
-    BitmapFactory.decodeFile(
-        imageFile.absolutePath,
-        options
-    )
-
-    val width = options.outWidth
-    val height = options.outHeight
-
-    if (width <= 0 || height <= 0) {
-        throw IllegalStateException(
-            "Não foi possível identificar o tamanho da imagem."
-        )
-    }
-
-    Log.d(
-        IMAGE_LOG_TAG,
-        "IMAGEM ORIGINAL | ${width}x${height} | " +
-                "Arquivo: ${imageFile.absolutePath}"
-    )
-
-    width.toFloat() / height.toFloat()
-}
-
-@Composable
-private fun PageLoadingContent(
-    pageNumber: Int
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 280.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        CircularProgressIndicator()
-
-        Text(
-            text = "Baixando página $pageNumber...",
-            modifier = Modifier.padding(top = 12.dp),
-            color = Color.White
-        )
-    }
-}
-
-@Composable
-private fun LoadingContent(
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        CircularProgressIndicator()
-
-        Text(
-            text = "Carregando páginas...",
-            modifier = Modifier.padding(top = 12.dp),
-            color = Color.White
-        )
-    }
-}
-
-@Composable
-private fun ReaderTopBar(
-    chapterName: String,
-    currentPage: Int,
-    totalPages: Int,
-    progress: Float,
-    onBackClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Color.Black.copy(alpha = 0.78f)
-            )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = 8.dp,
-                    vertical = 6.dp
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement =
-                Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(
-                onClick = onBackClick
-            ) {
-                Icon(
-                    imageVector =
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = Color.White
-                )
-            }
-
-            Text(
-                text = chapterName,
-                modifier = Modifier.weight(1f),
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            if (totalPages > 0) {
-                Text(
-                    text = "$currentPage / $totalPages",
-                    color = Color.White,
-                    style =
-                        MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
-        if (totalPages > 0) {
-            LinearProgressIndicator(
-                progress = {
-                    progress
+            ReaderBottomBar(
+                currentPage =
+                    currentPageIndex,
+                totalPages = pages.size,
+                onPageSelected = { pageIndex ->
+                    requestedPage = pageIndex
                 },
-                modifier = Modifier.fillMaxWidth()
+                onSettingsClick = {
+                    settingsVisible = true
+                }
             )
         }
+    }
+
+    if (settingsVisible) {
+        ReaderSettingsSheet(
+            preferences = preferences,
+            onPreferencesChange = { newPreferences ->
+                preferences = newPreferences
+            },
+            onDismiss = {
+                settingsVisible = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun ReaderModeContent(
+    pages: List<ReaderPage>,
+    mode: ReaderMode,
+    longStripGapDp: Int,
+    initialPage: Int,
+    requestedPage: Int?,
+    imageDownloader: ReaderImageDownloader,
+    backgroundColor: Color,
+    onPageChanged: (Int) -> Unit,
+    onRequestedPageConsumed: () -> Unit,
+    onTap: () -> Unit
+) {
+    when (mode) {
+        ReaderMode.LONG_STRIP,
+        ReaderMode.LONG_STRIP_GAPS -> {
+            LongStripReader(
+                pages = pages,
+                mode = mode,
+                gapDp = longStripGapDp,
+                initialPage = initialPage,
+                requestedPage = requestedPage,
+                imageDownloader = imageDownloader,
+                backgroundColor = backgroundColor,
+                onPageChanged = onPageChanged,
+                onRequestedPageConsumed =
+                    onRequestedPageConsumed,
+                onTap = onTap
+            )
+        }
+
+        ReaderMode.PAGED_LEFT_TO_RIGHT,
+        ReaderMode.PAGED_RIGHT_TO_LEFT -> {
+            HorizontalPagedReader(
+                pages = pages,
+                mode = mode,
+                initialPage = initialPage,
+                requestedPage = requestedPage,
+                imageDownloader = imageDownloader,
+                backgroundColor = backgroundColor,
+                onPageChanged = onPageChanged,
+                onRequestedPageConsumed =
+                    onRequestedPageConsumed,
+                onTap = onTap
+            )
+        }
+
+        ReaderMode.PAGED_VERTICAL -> {
+            VerticalPagedReader(
+                pages = pages,
+                initialPage = initialPage,
+                requestedPage = requestedPage,
+                imageDownloader = imageDownloader,
+                backgroundColor = backgroundColor,
+                onPageChanged = onPageChanged,
+                onRequestedPageConsumed =
+                    onRequestedPageConsumed,
+                onTap = onTap
+            )
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+
+        is ContextWrapper -> {
+            baseContext.findActivity()
+        }
+
+        else -> null
     }
 }

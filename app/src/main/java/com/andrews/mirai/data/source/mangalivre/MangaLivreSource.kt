@@ -1,83 +1,43 @@
 package com.andrews.mirai.data.source.mangalivre
 
-import com.andrews.mirai.data.remote.HttpClient
-import com.andrews.mirai.data.source.MangaSource
+import com.andrews.mirai.data.source.madara.MadaraSource
+import com.andrews.mirai.data.source.madara.MadaraSourceConfig
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.domain.model.ReaderPage
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
-class MangaLivreSource : MangaSource {
+class MangaLivreSource : MadaraSource(
 
-    override val id = "mangalivre"
+    config = MadaraSourceConfig(
+        id = "mangalivre",
+        name = "Manga Livre",
+        baseUrl = "https://mangalivre.blog"
+    )
 
-    override val name = "Manga Livre"
+) {
 
-    override val baseUrl = "https://mangalivre.blog"
-
-    private val http = HttpClient
-
-    private val homeParser = HomeParser(baseUrl)
-
-    private val detailsParser = DetailsParser(baseUrl)
-
-    private val chapterParser = ChapterParser(baseUrl)
-
-    private val pageParser = PageParser(baseUrl)
-
-    override suspend fun getPopular(
-        page: Int
-    ): List<Manga> {
-        val url = if (page <= 1) {
-            "$baseUrl/"
-        } else {
-            "$baseUrl/page/$page/"
-        }
-
-        val response = http.get(url)
-
-        if (!response.isSuccessful) {
-            return emptyList()
-        }
-
-        return homeParser.parse(response.body)
+    private val detailsParser by lazy {
+        DetailsParser(baseUrl)
     }
 
-    override suspend fun search(
-        query: String,
-        page: Int
-    ): List<Manga> {
-        val normalizedQuery = query.trim()
+    private val chapterParser by lazy {
+        ChapterParser(baseUrl)
+    }
 
-        if (normalizedQuery.isBlank()) {
-            return getPopular(page)
-        }
-
-        val encodedQuery = URLEncoder.encode(
-            normalizedQuery,
-            StandardCharsets.UTF_8.toString()
-        )
-
-        val url = if (page <= 1) {
-            "$baseUrl/?s=$encodedQuery"
-        } else {
-            "$baseUrl/?s=$encodedQuery&paged=$page"
-        }
-
-        val response = http.get(url)
-
-        if (!response.isSuccessful) {
-            return emptyList()
-        }
-
-        return homeParser.parse(response.body)
+    private val pageParser by lazy {
+        PageParser(baseUrl)
     }
 
     override suspend fun getDetails(
         manga: Manga
     ): Manga {
-        val response = http.get(manga.id)
+        val detailsUrl = resolveUrl(manga.id)
+
+        if (detailsUrl.isBlank()) {
+            return manga
+        }
+
+        val response = http.get(detailsUrl)
 
         if (!response.isSuccessful) {
             return manga
@@ -92,7 +52,13 @@ class MangaLivreSource : MangaSource {
     override suspend fun getChapters(
         manga: Manga
     ): List<Chapter> {
-        val response = http.get(manga.id)
+        val detailsUrl = resolveUrl(manga.id)
+
+        if (detailsUrl.isBlank()) {
+            return emptyList()
+        }
+
+        val response = http.get(detailsUrl)
 
         if (!response.isSuccessful) {
             return emptyList()
@@ -107,8 +73,14 @@ class MangaLivreSource : MangaSource {
     override suspend fun getPages(
         chapter: Chapter
     ): List<ReaderPage> {
-        val chapterUrl = chapter.url.ifBlank {
-            chapter.id
+        val chapterUrl = resolveUrl(
+            chapter.url.ifBlank {
+                chapter.id
+            }
+        )
+
+        if (chapterUrl.isBlank()) {
+            return emptyList()
         }
 
         val response = http.get(chapterUrl)
@@ -117,6 +89,34 @@ class MangaLivreSource : MangaSource {
             return emptyList()
         }
 
-        return pageParser.parse(response.body)
+        return pageParser.parse(
+            html = response.body
+        )
+    }
+
+    private fun resolveUrl(
+        value: String
+    ): String {
+        val normalizedValue = value.trim()
+
+        if (normalizedValue.isBlank()) {
+            return ""
+        }
+
+        return when {
+            normalizedValue.startsWith(
+                "https://",
+                ignoreCase = true
+            ) -> normalizedValue
+
+            normalizedValue.startsWith(
+                "http://",
+                ignoreCase = true
+            ) -> normalizedValue
+
+            else -> {
+                "$baseUrl/${normalizedValue.trimStart('/')}"
+            }
+        }
     }
 }
