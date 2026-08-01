@@ -1,12 +1,14 @@
 package com.andrews.mirai.presentation.reader.progress
 
 import android.content.Context
+import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import org.json.JSONArray
 import org.json.JSONObject
 
 data class ReadingHistoryItem(
+    val sourceId: String,
     val mangaId: String,
     val mangaTitle: String,
     val mangaCoverUrl: String?,
@@ -20,13 +22,19 @@ data class ReadingHistoryItem(
 class ReadingProgressStore(
     context: Context
 ) {
-    private val preferences = context.getSharedPreferences(
-        "mirai_reading_progress",
-        Context.MODE_PRIVATE
-    )
+    private val preferences =
+        context.applicationContext.getSharedPreferences(
+            PREFERENCES_NAME,
+            Context.MODE_PRIVATE
+        )
 
-    fun getPage(chapterId: String): Int {
-        return preferences.getInt(chapterId, 0)
+    fun getPage(
+        chapterId: String
+    ): Int {
+        return preferences.getInt(
+            chapterId,
+            0
+        )
     }
 
     fun savePage(
@@ -34,27 +42,56 @@ class ReadingProgressStore(
         pageIndex: Int,
         totalPages: Int = 0
     ) {
+        val safePageIndex =
+            pageIndex.coerceAtLeast(0)
+
+        val safeTotalPages =
+            totalPages.coerceAtLeast(0)
+
         preferences
             .edit()
-            .putInt(chapterId, pageIndex)
-            .putBoolean(viewedKey(chapterId), true)
+            .putInt(
+                chapterId,
+                safePageIndex
+            )
+            .putBoolean(
+                viewedKey(chapterId),
+                true
+            )
             .apply()
 
         updateHistoryPage(
             chapterId = chapterId,
-            pageIndex = pageIndex,
-            totalPages = totalPages
+            pageIndex = safePageIndex,
+            totalPages = safeTotalPages
         )
     }
 
-    fun markViewed(chapterId: String) {
+    fun markViewed(
+        chapterId: String
+    ) {
         preferences
             .edit()
-            .putBoolean(viewedKey(chapterId), true)
+            .putBoolean(
+                viewedKey(chapterId),
+                true
+            )
             .apply()
     }
 
-    fun isViewed(chapterId: String): Boolean {
+    fun markNotViewed(
+        chapterId: String
+    ) {
+        preferences
+            .edit()
+            .remove(viewedKey(chapterId))
+            .remove(chapterId)
+            .apply()
+    }
+
+    fun isViewed(
+        chapterId: String
+    ): Boolean {
         return preferences.getBoolean(
             viewedKey(chapterId),
             false
@@ -63,17 +100,20 @@ class ReadingProgressStore(
 
     fun registerReading(
         manga: Manga,
-        chapter: Chapter
+        chapter: Chapter,
+        sourceId: String =
+            SourceRepository.currentSource.id
     ) {
-        val history = getHistory()
+        val updatedHistory = getHistory()
             .filterNot { item ->
-                item.chapterId == chapter.id
+                item.mangaId == manga.id
             }
             .toMutableList()
 
-        history.add(
+        updatedHistory.add(
             index = 0,
             element = ReadingHistoryItem(
+                sourceId = sourceId,
                 mangaId = manga.id,
                 mangaTitle = manga.title,
                 mangaCoverUrl = manga.coverUrl,
@@ -86,40 +126,116 @@ class ReadingProgressStore(
         )
 
         saveHistory(
-            history = history.take(MAX_HISTORY_ITEMS)
+            updatedHistory.take(
+                MAX_HISTORY_ITEMS
+            )
         )
     }
 
     fun getHistory(): List<ReadingHistoryItem> {
-        val savedHistory = preferences.getString(
-            HISTORY_KEY,
-            null
-        ) ?: return emptyList()
+        val savedHistory =
+            preferences.getString(
+                HISTORY_KEY,
+                null
+            ) ?: return emptyList()
 
         return runCatching {
-            val jsonArray = JSONArray(savedHistory)
+            val jsonArray =
+                JSONArray(savedHistory)
 
             buildList {
-                for (index in 0 until jsonArray.length()) {
-                    val item = jsonArray.getJSONObject(index)
+                for (
+                index in 0 until
+                        jsonArray.length()
+                ) {
+                    val item =
+                        jsonArray.getJSONObject(
+                            index
+                        )
+
+                    val mangaId =
+                        item.optString("mangaId")
+
+                    val chapterId =
+                        item.optString("chapterId")
+
+                    if (
+                        mangaId.isBlank() ||
+                        chapterId.isBlank()
+                    ) {
+                        continue
+                    }
+
+                    val savedSourceId =
+                        item.optString("sourceId")
+
+                    val resolvedSourceId =
+                        savedSourceId.ifBlank {
+                            detectSourceId(
+                                mangaId = mangaId,
+                                chapterId = chapterId
+                            )
+                        }
 
                     add(
                         ReadingHistoryItem(
-                            mangaId = item.optString("mangaId"),
-                            mangaTitle = item.optString("mangaTitle"),
-                            mangaCoverUrl = item
-                                .optString("mangaCoverUrl")
-                                .takeIf { it.isNotBlank() },
-                            chapterId = item.optString("chapterId"),
-                            chapterName = item.optString("chapterName"),
-                            pageIndex = item.optInt("pageIndex"),
-                            totalPages = item.optInt("totalPages"),
-                            readAt = item.optLong("readAt")
+                            sourceId = resolvedSourceId,
+                            mangaId = mangaId,
+                            mangaTitle =
+                                item.optString(
+                                    "mangaTitle"
+                                ),
+                            mangaCoverUrl =
+                                item
+                                    .optString(
+                                        "mangaCoverUrl"
+                                    )
+                                    .takeIf { value ->
+                                        value.isNotBlank()
+                                    },
+                            chapterId = chapterId,
+                            chapterName =
+                                item.optString(
+                                    "chapterName"
+                                ),
+                            pageIndex =
+                                item.optInt(
+                                    "pageIndex"
+                                ).coerceAtLeast(0),
+                            totalPages =
+                                item.optInt(
+                                    "totalPages"
+                                ).coerceAtLeast(0),
+                            readAt =
+                                item.optLong(
+                                    "readAt"
+                                )
                         )
                     )
                 }
             }
-        }.getOrDefault(emptyList())
+                .distinctBy { item ->
+                    item.mangaId
+                }
+                .sortedByDescending { item ->
+                    item.readAt
+                }
+        }.getOrDefault(
+            emptyList()
+        )
+    }
+
+    fun removeHistoryItem(
+        mangaId: String
+    ) {
+        val updatedHistory = getHistory()
+            .filterNot { item ->
+                item.mangaId == mangaId
+            }
+
+        saveHistory(
+            updatedHistory
+        )
     }
 
     fun clearHistory() {
@@ -136,7 +252,8 @@ class ReadingProgressStore(
     ) {
         val history = getHistory()
 
-        if (history.none { item ->
+        if (
+            history.none { item ->
                 item.chapterId == chapterId
             }
         ) {
@@ -145,11 +262,15 @@ class ReadingProgressStore(
 
         val updatedHistory = history
             .map { item ->
-                if (item.chapterId == chapterId) {
+                if (
+                    item.chapterId ==
+                    chapterId
+                ) {
                     item.copy(
                         pageIndex = pageIndex,
                         totalPages = totalPages,
-                        readAt = System.currentTimeMillis()
+                        readAt =
+                            System.currentTimeMillis()
                     )
                 } else {
                     item
@@ -159,7 +280,9 @@ class ReadingProgressStore(
                 item.readAt
             }
 
-        saveHistory(updatedHistory)
+        saveHistory(
+            updatedHistory
+        )
     }
 
     private fun saveHistory(
@@ -167,23 +290,61 @@ class ReadingProgressStore(
     ) {
         val jsonArray = JSONArray()
 
-        history.forEach { item ->
-            jsonArray.put(
-                JSONObject().apply {
-                    put("mangaId", item.mangaId)
-                    put("mangaTitle", item.mangaTitle)
-                    put(
-                        "mangaCoverUrl",
-                        item.mangaCoverUrl.orEmpty()
-                    )
-                    put("chapterId", item.chapterId)
-                    put("chapterName", item.chapterName)
-                    put("pageIndex", item.pageIndex)
-                    put("totalPages", item.totalPages)
-                    put("readAt", item.readAt)
-                }
-            )
-        }
+        history
+            .distinctBy { item ->
+                item.mangaId
+            }
+            .take(MAX_HISTORY_ITEMS)
+            .forEach { item ->
+                jsonArray.put(
+                    JSONObject().apply {
+                        put(
+                            "sourceId",
+                            item.sourceId
+                        )
+
+                        put(
+                            "mangaId",
+                            item.mangaId
+                        )
+
+                        put(
+                            "mangaTitle",
+                            item.mangaTitle
+                        )
+
+                        put(
+                            "mangaCoverUrl",
+                            item.mangaCoverUrl.orEmpty()
+                        )
+
+                        put(
+                            "chapterId",
+                            item.chapterId
+                        )
+
+                        put(
+                            "chapterName",
+                            item.chapterName
+                        )
+
+                        put(
+                            "pageIndex",
+                            item.pageIndex
+                        )
+
+                        put(
+                            "totalPages",
+                            item.totalPages
+                        )
+
+                        put(
+                            "readAt",
+                            item.readAt
+                        )
+                    }
+                )
+            }
 
         preferences
             .edit()
@@ -194,12 +355,46 @@ class ReadingProgressStore(
             .apply()
     }
 
-    private fun viewedKey(chapterId: String): String {
+    private fun detectSourceId(
+        mangaId: String,
+        chapterId: String
+    ): String {
+        val combinedValue =
+            "$mangaId $chapterId".lowercase()
+
+        return when {
+            combinedValue.contains(
+                "mangalivre.blog"
+            ) -> {
+                "mangalivre"
+            }
+
+            combinedValue.contains(
+                "astratoons.com"
+            ) -> {
+                "astraltoons"
+            }
+
+            else -> {
+                SourceRepository.currentSource.id
+            }
+        }
+    }
+
+    private fun viewedKey(
+        chapterId: String
+    ): String {
         return "viewed_$chapterId"
     }
 
     private companion object {
-        const val HISTORY_KEY = "reading_history"
-        const val MAX_HISTORY_ITEMS = 100
+        const val PREFERENCES_NAME =
+            "mirai_reading_progress"
+
+        const val HISTORY_KEY =
+            "reading_history"
+
+        const val MAX_HISTORY_ITEMS =
+            100
     }
 }

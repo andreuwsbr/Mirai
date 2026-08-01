@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -29,6 +30,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,15 +45,20 @@ import com.andrews.mirai.data.local.FavoriteStore
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
+import com.andrews.mirai.presentation.details.components.ChapterListControls
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun DetailsScreen(
     manga: Manga,
     onBackClick: () -> Unit,
-    onChapterClick: (Chapter) -> Unit
+    onChapterClick: (
+        chapter: Chapter,
+        chapters: List<Chapter>
+    ) -> Unit
 ) {
     val applicationContext =
         LocalContext.current.applicationContext
@@ -59,16 +67,11 @@ fun DetailsScreen(
         ReadingProgressStore(applicationContext)
     }
 
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
     var detailedManga by remember(manga.id) {
         mutableStateOf(manga)
-    }
-
-    val favorites by FavoriteStore
-        .favorites
-        .collectAsStateWithLifecycle()
-
-    val isFavorite = favorites.any { favorite ->
-        favorite.id == detailedManga.id
     }
 
     var chapters by remember(manga.id) {
@@ -77,6 +80,18 @@ fun DetailsScreen(
 
     var viewedChapterIds by remember(manga.id) {
         mutableStateOf<Set<String>>(emptySet())
+    }
+
+    var chapterQuery by rememberSaveable(manga.id) {
+        mutableStateOf("")
+    }
+
+    var searchExpanded by rememberSaveable(manga.id) {
+        mutableStateOf(false)
+    }
+
+    var descendingOrder by rememberSaveable(manga.id) {
+        mutableStateOf(true)
     }
 
     var detailsLoading by remember(manga.id) {
@@ -95,6 +110,14 @@ fun DetailsScreen(
         mutableStateOf<String?>(null)
     }
 
+    val favorites by FavoriteStore
+        .favorites
+        .collectAsStateWithLifecycle()
+
+    val isFavorite = favorites.any { favorite ->
+        favorite.id == detailedManga.id
+    }
+
     LaunchedEffect(manga.id) {
         detailsLoading = true
         chaptersLoading = true
@@ -103,41 +126,87 @@ fun DetailsScreen(
 
         runCatching {
             withContext(Dispatchers.IO) {
-                SourceRepository.currentSource.getDetails(manga)
+                SourceRepository.currentSource.getDetails(
+                    manga
+                )
             }
         }.onSuccess { result ->
             detailedManga = result
         }.onFailure { throwable ->
-            detailsError = throwable.message
-                ?: "Erro ao carregar os detalhes."
+            detailsError =
+                throwable.message
+                    ?: "Erro ao carregar os detalhes."
         }
 
         detailsLoading = false
 
         runCatching {
             withContext(Dispatchers.IO) {
-                SourceRepository.currentSource.getChapters(manga)
+                SourceRepository.currentSource.getChapters(
+                    manga
+                )
             }
         }.onSuccess { result ->
             chapters = result
 
             viewedChapterIds = result
                 .filter { chapter ->
-                    progressStore.isViewed(chapter.id)
+                    progressStore.isViewed(
+                        chapter.id
+                    )
                 }
                 .map { chapter ->
                     chapter.id
                 }
                 .toSet()
         }.onFailure { throwable ->
-            chaptersError = throwable.message
-                ?: "Erro ao carregar os capítulos."
+            chaptersError =
+                throwable.message
+                    ?: "Erro ao carregar os capítulos."
         }
 
         chaptersLoading = false
     }
 
+    val normalizedQuery = chapterQuery.trim()
+
+    val exactChapterNumber = normalizedQuery
+        .replace(",", ".")
+        .toDoubleOrNull()
+
+    val filteredChapters = chapters
+        .filter { chapter ->
+            when {
+                normalizedQuery.isBlank() -> {
+                    true
+                }
+
+                exactChapterNumber != null -> {
+                    chapter.number == exactChapterNumber
+                }
+
+                else -> {
+                    chapter.name.contains(
+                        normalizedQuery,
+                        ignoreCase = true
+                    )
+                }
+            }
+        }
+        .let { result ->
+            if (descendingOrder) {
+                result.sortedByDescending { chapter ->
+                    chapter.number
+                }
+            } else {
+                result.sortedBy { chapter ->
+                    chapter.number
+                }
+            }
+        }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize()
     ) {
         item {
@@ -183,7 +252,8 @@ fun DetailsScreen(
                         tint = if (isFavorite) {
                             MaterialTheme.colorScheme.primary
                         } else {
-                            MaterialTheme.colorScheme
+                            MaterialTheme
+                                .colorScheme
                                 .onSurfaceVariant
                         }
                     )
@@ -211,7 +281,8 @@ fun DetailsScreen(
                     Text(
                         text =
                             "Não foi possível carregar todos os detalhes.\n$detailsError",
-                        color = MaterialTheme.colorScheme.error
+                        color =
+                            MaterialTheme.colorScheme.error
                     )
 
                     Spacer(
@@ -241,11 +312,14 @@ fun DetailsScreen(
                         modifier = Modifier.width(16.dp)
                     )
 
-                    Column {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = detailedManga.title,
                             style =
-                                MaterialTheme.typography
+                                MaterialTheme
+                                    .typography
                                     .headlineSmall
                         )
 
@@ -257,10 +331,12 @@ fun DetailsScreen(
                             text =
                                 "Tipo: ${detailedManga.type.name}",
                             style =
-                                MaterialTheme.typography
+                                MaterialTheme
+                                    .typography
                                     .labelLarge,
                             color =
-                                MaterialTheme.colorScheme
+                                MaterialTheme
+                                    .colorScheme
                                     .onSurfaceVariant
                         )
 
@@ -272,7 +348,8 @@ fun DetailsScreen(
                             text =
                                 "Autor: ${detailedManga.author}",
                             style =
-                                MaterialTheme.typography
+                                MaterialTheme
+                                    .typography
                                     .bodyMedium
                         )
 
@@ -284,7 +361,8 @@ fun DetailsScreen(
                             text =
                                 "Status: ${detailedManga.status.name}",
                             style =
-                                MaterialTheme.typography
+                                MaterialTheme
+                                    .typography
                                     .bodyMedium
                         )
                     }
@@ -296,7 +374,8 @@ fun DetailsScreen(
 
                 Text(
                     text = "Sinopse",
-                    style = MaterialTheme.typography.titleLarge
+                    style =
+                        MaterialTheme.typography.titleLarge
                 )
 
                 Spacer(
@@ -304,10 +383,12 @@ fun DetailsScreen(
                 )
 
                 Text(
-                    text = detailedManga.description.ifBlank {
-                        "A sinopse não foi encontrada."
-                    },
-                    style = MaterialTheme.typography.bodyMedium
+                    text =
+                        detailedManga.description.ifBlank {
+                            "A sinopse não foi encontrada."
+                        },
+                    style =
+                        MaterialTheme.typography.bodyMedium
                 )
 
                 if (detailedManga.genres.isNotEmpty()) {
@@ -318,7 +399,9 @@ fun DetailsScreen(
                     Text(
                         text = "Gêneros",
                         style =
-                            MaterialTheme.typography.titleLarge
+                            MaterialTheme
+                                .typography
+                                .titleLarge
                     )
 
                     Spacer(
@@ -327,11 +410,12 @@ fun DetailsScreen(
 
                     Text(
                         text =
-                            detailedManga.genres.joinToString(
-                                ", "
-                            ),
+                            detailedManga.genres
+                                .joinToString(", "),
                         style =
-                            MaterialTheme.typography.bodyMedium
+                            MaterialTheme
+                                .typography
+                                .bodyMedium
                     )
                 }
 
@@ -347,11 +431,59 @@ fun DetailsScreen(
 
                 Text(
                     text = "Capítulos",
-                    style = MaterialTheme.typography.titleLarge
+                    style =
+                        MaterialTheme.typography.titleLarge
+                )
+
+                Spacer(
+                    modifier = Modifier.height(6.dp)
+                )
+
+                ChapterListControls(
+                    query = chapterQuery,
+                    searchExpanded = searchExpanded,
+                    descendingOrder = descendingOrder,
+
+                    onQueryChange = { value ->
+                        chapterQuery = value
+                    },
+
+                    onSearchExpandedChange = { expanded ->
+                        searchExpanded = expanded
+                    },
+
+                    onToggleOrder = {
+                        descendingOrder =
+                            !descendingOrder
+
+                        chapterQuery = ""
+
+                        scope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    }
                 )
 
                 Spacer(
                     modifier = Modifier.height(4.dp)
+                )
+
+                Text(
+                    text = if (descendingOrder) {
+                        "Ordem: mais recente primeiro"
+                    } else {
+                        "Ordem: mais antigo primeiro"
+                    },
+                    style =
+                        MaterialTheme.typography.bodySmall,
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
+                )
+
+                Spacer(
+                    modifier = Modifier.height(6.dp)
                 )
 
                 if (
@@ -359,12 +491,20 @@ fun DetailsScreen(
                     chapters.isNotEmpty()
                 ) {
                     Text(
-                        text =
-                            "${chapters.size} capítulos encontrados",
+                        text = if (
+                            normalizedQuery.isNotBlank()
+                        ) {
+                            "${filteredChapters.size} resultado(s)"
+                        } else {
+                            "${chapters.size} capítulos encontrados"
+                        },
                         style =
-                            MaterialTheme.typography.bodySmall,
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
                         color =
-                            MaterialTheme.colorScheme
+                            MaterialTheme
+                                .colorScheme
                                 .onSurfaceVariant
                     )
                 }
@@ -394,7 +534,23 @@ fun DetailsScreen(
                         text =
                             "Nenhum capítulo foi encontrado.",
                         color =
-                            MaterialTheme.colorScheme
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                    )
+                }
+
+                if (
+                    !chaptersLoading &&
+                    chapters.isNotEmpty() &&
+                    filteredChapters.isEmpty()
+                ) {
+                    Text(
+                        text =
+                            "Nenhum capítulo corresponde à pesquisa.",
+                        color =
+                            MaterialTheme
+                                .colorScheme
                                 .onSurfaceVariant
                     )
                 }
@@ -402,7 +558,7 @@ fun DetailsScreen(
         }
 
         items(
-            items = chapters,
+            items = filteredChapters,
             key = { chapter ->
                 chapter.id
             }
@@ -426,7 +582,10 @@ fun DetailsScreen(
                     viewedChapterIds =
                         viewedChapterIds + chapter.id
 
-                    onChapterClick(chapter)
+                    onChapterClick(
+                        chapter,
+                        chapters
+                    )
                 }
             )
         }
@@ -459,7 +618,9 @@ private fun ChapterItem(
                 horizontal = 20.dp,
                 vertical = 5.dp
             )
-            .clickable(onClick = onClick),
+            .clickable(
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(14.dp),
         tonalElevation = 2.dp
     ) {
@@ -469,7 +630,9 @@ private fun ChapterItem(
             Text(
                 text = chapter.name,
                 style =
-                    MaterialTheme.typography.titleMedium
+                    MaterialTheme
+                        .typography
+                        .titleMedium
             )
 
             if (chapter.uploadedAt.isNotBlank()) {
@@ -480,9 +643,12 @@ private fun ChapterItem(
                 Text(
                     text = chapter.uploadedAt,
                     style =
-                        MaterialTheme.typography.bodySmall,
+                        MaterialTheme
+                            .typography
+                            .bodySmall,
                     color =
-                        MaterialTheme.colorScheme
+                        MaterialTheme
+                            .colorScheme
                             .onSurfaceVariant
                 )
             }
@@ -495,9 +661,13 @@ private fun ChapterItem(
                 Text(
                     text = "Visto",
                     style =
-                        MaterialTheme.typography.labelMedium,
+                        MaterialTheme
+                            .typography
+                            .labelMedium,
                     color =
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme
+                            .colorScheme
+                            .primary
                 )
             }
         }

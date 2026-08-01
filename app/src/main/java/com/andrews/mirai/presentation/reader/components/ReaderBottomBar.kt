@@ -1,6 +1,7 @@
 package com.andrews.mirai.presentation.reader.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,7 +24,11 @@ import androidx.compose.ui.unit.dp
 fun ReaderBottomBar(
     currentPage: Int,
     totalPages: Int,
+    hasPreviousChapter: Boolean,
+    hasNextChapter: Boolean,
     onPageSelected: (Int) -> Unit,
+    onPreviousChapterClick: () -> Unit,
+    onNextChapterClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -32,9 +38,45 @@ fun ReaderBottomBar(
             .background(Color(0xE6111725))
             .padding(
                 horizontal = 16.dp,
-                vertical = 10.dp
+                vertical = 8.dp
             )
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.SpaceBetween,
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            TextButton(
+                enabled = hasPreviousChapter,
+                onClick = onPreviousChapterClick
+            ) {
+                Text(
+                    text = "← Anterior",
+                    color = if (hasPreviousChapter) {
+                        Color.White
+                    } else {
+                        Color.Gray
+                    }
+                )
+            }
+
+            TextButton(
+                enabled = hasNextChapter,
+                onClick = onNextChapterClick
+            ) {
+                Text(
+                    text = "Próximo →",
+                    color = if (hasNextChapter) {
+                        Color.White
+                    } else {
+                        Color.Gray
+                    }
+                )
+            }
+        }
+
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -68,8 +110,10 @@ fun ReaderBottomBar(
                 onClick = onSettingsClick
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Configurações",
+                    imageVector =
+                        Icons.Outlined.Settings,
+                    contentDescription =
+                        "Configurações",
                     tint = Color.White
                 )
             }

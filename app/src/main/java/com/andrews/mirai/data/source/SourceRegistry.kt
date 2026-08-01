@@ -1,11 +1,13 @@
 package com.andrews.mirai.data.source
 
 import com.andrews.mirai.data.source.mangalivre.MangaLivreSource
+import com.andrews.mirai.data.source.astratoons.AstralToonsSource
 
 object SourceRegistry {
 
     private val registeredSources: List<MangaSource> = listOf(
-        MangaLivreSource()
+        MangaLivreSource(),
+        AstralToonsSource()
     )
 
     fun all(): List<MangaSource> {

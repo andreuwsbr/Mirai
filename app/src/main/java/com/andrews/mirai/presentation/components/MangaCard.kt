@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.andrews.mirai.domain.model.Manga
@@ -27,48 +30,95 @@ fun MangaCard(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .clickable(
+                onClick = onClick
+            )
+            .padding(
+                bottom = 4.dp
+            ),
+        verticalArrangement =
+            Arrangement.spacedBy(7.dp)
     ) {
         if (!manga.coverUrl.isNullOrBlank()) {
             AsyncImage(
                 model = manga.coverUrl,
-                contentDescription = "Capa de ${manga.title}",
-                contentScale = ContentScale.Crop,
+                contentDescription =
+                    "Capa de ${manga.title}",
+                contentScale =
+                    ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .aspectRatio(0.72f)
+                    .clip(
+                        RoundedCornerShape(16.dp)
+                    )
             )
         } else {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .aspectRatio(0.72f)
+                    .clip(
+                        RoundedCornerShape(16.dp)
+                    )
                     .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(18.dp)
+                        MaterialTheme
+                            .colorScheme
+                            .surfaceVariant
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment =
+                    Alignment.Center
             ) {
                 Text(
-                    text = manga.title.take(1),
-                    style = MaterialTheme.typography.displayMedium
+                    text = manga.title
+                        .take(1)
+                        .uppercase(),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .displayMedium
                 )
             }
         }
 
         Text(
             text = manga.title,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 2
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min = 40.dp
+                )
+                .padding(
+                    horizontal = 2.dp
+                ),
+            style =
+                MaterialTheme
+                    .typography
+                    .titleSmall,
+            maxLines = 2,
+            overflow =
+                TextOverflow.Ellipsis
         )
 
         Text(
             text = manga.type.name,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = 2.dp,
+                    vertical = 1.dp
+                ),
+            style =
+                MaterialTheme
+                    .typography
+                    .labelSmall,
+            color =
+                MaterialTheme
+                    .colorScheme
+                    .onSurfaceVariant,
+            maxLines = 1,
+            overflow =
+                TextOverflow.Clip
         )
     }
 }

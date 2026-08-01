@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.andrews.mirai.data.local.FavoriteStore
+import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.navigation.MiraiDestination
@@ -40,6 +41,7 @@ fun MiraiApp() {
 
     remember(context) {
         FavoriteStore.initialize(context)
+        SourceRepository.initialize(context)
         true
     }
 
@@ -54,6 +56,12 @@ fun MiraiApp() {
         mutableStateOf<Chapter?>(null)
     }
 
+    var selectedChapters by remember {
+        mutableStateOf<List<Chapter>>(
+            emptyList()
+        )
+    }
+
     val backStack by
     navController.currentBackStackEntryAsState()
 
@@ -63,6 +71,29 @@ fun MiraiApp() {
     val showBottomBar =
         currentRoute != DETAILS_ROUTE &&
                 currentRoute != READER_ROUTE
+
+    fun openSavedChapter(
+        chapter: Chapter,
+        sourceId: String
+    ) {
+        val sourceSelected =
+            SourceRepository.selectSource(
+                sourceId
+            )
+
+        if (!sourceSelected) {
+            return
+        }
+
+        selectedChapter = chapter
+        selectedChapters = emptyList()
+
+        navController.navigate(
+            READER_ROUTE
+        ) {
+            launchSingleTop = true
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -100,7 +131,8 @@ fun MiraiApp() {
                                 },
                                 label = {
                                     Text(
-                                        destination.label
+                                        text =
+                                            destination.label
                                     )
                                 },
                                 colors =
@@ -116,24 +148,29 @@ fun MiraiApp() {
             navController = navController,
             startDestination =
                 MiraiDestination.Home.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier =
+                Modifier.padding(innerPadding)
         ) {
             composable(
                 MiraiDestination.Home.route
             ) {
                 HomeScreen(
-                    onMangaClick = { manga ->
+                    onMangaClick = {
+                            manga: Manga ->
+
                         selectedManga = manga
 
                         navController.navigate(
                             DETAILS_ROUTE
                         )
                     },
-                    onContinueReadingClick = { chapter ->
-                        selectedChapter = chapter
+                    onContinueReadingClick = {
+                            chapter: Chapter,
+                            sourceId: String ->
 
-                        navController.navigate(
-                            READER_ROUTE
+                        openSavedChapter(
+                            chapter = chapter,
+                            sourceId = sourceId
                         )
                     }
                 )
@@ -143,7 +180,9 @@ fun MiraiApp() {
                 MiraiDestination.Catalog.route
             ) {
                 CatalogScreen(
-                    onMangaClick = { manga ->
+                    onMangaClick = {
+                            manga: Manga ->
+
                         selectedManga = manga
 
                         navController.navigate(
@@ -157,7 +196,9 @@ fun MiraiApp() {
                 MiraiDestination.Library.route
             ) {
                 LibraryScreen(
-                    onMangaClick = { manga ->
+                    onMangaClick = {
+                            manga: Manga ->
+
                         selectedManga = manga
 
                         navController.navigate(
@@ -170,7 +211,17 @@ fun MiraiApp() {
             composable(
                 MiraiDestination.History.route
             ) {
-                HistoryScreen()
+                HistoryScreen(
+                    onContinueReading = {
+                            chapter: Chapter,
+                            sourceId: String ->
+
+                        openSavedChapter(
+                            chapter = chapter,
+                            sourceId = sourceId
+                        )
+                    }
+                )
             }
 
             composable(
@@ -179,8 +230,11 @@ fun MiraiApp() {
                 SettingsScreen()
             }
 
-            composable(DETAILS_ROUTE) {
-                val manga = selectedManga
+            composable(
+                DETAILS_ROUTE
+            ) {
+                val manga =
+                    selectedManga
 
                 if (manga != null) {
                     DetailsScreen(
@@ -188,8 +242,12 @@ fun MiraiApp() {
                         onBackClick = {
                             navController.popBackStack()
                         },
-                        onChapterClick = { chapter ->
+                        onChapterClick = {
+                                chapter: Chapter,
+                                chapters: List<Chapter> ->
+
                             selectedChapter = chapter
+                            selectedChapters = chapters
 
                             navController.navigate(
                                 READER_ROUTE
@@ -198,24 +256,36 @@ fun MiraiApp() {
                     )
                 } else {
                     Text(
-                        "Não foi possível carregar a obra."
+                        text =
+                            "Não foi possível carregar a obra."
                     )
                 }
             }
 
-            composable(READER_ROUTE) {
-                val chapter = selectedChapter
+            composable(
+                READER_ROUTE
+            ) {
+                val chapter =
+                    selectedChapter
 
                 if (chapter != null) {
                     ReaderScreen(
                         chapter = chapter,
+                        chapters = selectedChapters,
+                        onChapterSelected = {
+                                newChapter: Chapter ->
+
+                            selectedChapter =
+                                newChapter
+                        },
                         onBackClick = {
                             navController.popBackStack()
                         }
                     )
                 } else {
                     Text(
-                        "Não foi possível carregar o capítulo."
+                        text =
+                            "Não foi possível carregar o capítulo."
                     )
                 }
             }

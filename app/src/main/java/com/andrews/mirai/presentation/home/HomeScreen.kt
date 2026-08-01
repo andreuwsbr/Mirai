@@ -2,6 +2,7 @@ package com.andrews.mirai.presentation.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,11 +13,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +39,10 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HomeScreen(
     onMangaClick: (Manga) -> Unit = {},
-    onContinueReadingClick: (Chapter) -> Unit = {}
+    onContinueReadingClick: (
+        chapter: Chapter,
+        sourceId: String
+    ) -> Unit = { _, _ -> }
 ) {
     val applicationContext =
         LocalContext.current.applicationContext
@@ -49,6 +53,8 @@ fun HomeScreen(
 
     val listState = rememberLazyListState()
 
+    val source = SourceRepository.currentSource
+
     var query by rememberSaveable {
         mutableStateOf("")
     }
@@ -57,15 +63,15 @@ fun HomeScreen(
         mutableStateOf(false)
     }
 
-    var mangas by remember {
+    var mangas by remember(source.id) {
         mutableStateOf<List<Manga>>(emptyList())
     }
 
-    var loading by remember {
+    var loading by remember(source.id) {
         mutableStateOf(true)
     }
 
-    var errorMessage by remember {
+    var errorMessage by remember(source.id) {
         mutableStateOf<String?>(null)
     }
 
@@ -73,40 +79,45 @@ fun HomeScreen(
         mutableIntStateOf(0)
     }
 
-    val source = SourceRepository.currentSource
-
     val lastReading = progressStore
         .getHistory()
         .maxByOrNull { item ->
             item.readAt
         }
 
-    LaunchedEffect(reloadKey) {
+    LaunchedEffect(
+        reloadKey,
+        source.id
+    ) {
         loading = true
         errorMessage = null
 
         try {
             mangas = withContext(Dispatchers.IO) {
-                source.getPopular(page = 1)
+                source.getPopular(
+                    page = 1
+                )
             }
 
             if (mangas.isEmpty()) {
                 errorMessage =
-                    "A fonte não retornou nenhuma obra."
+                    "A fonte ${source.name} não retornou nenhuma obra."
             }
         } catch (exception: CancellationException) {
             throw exception
         } catch (throwable: Throwable) {
             mangas = emptyList()
 
-            errorMessage = throwable.message
-                ?: "Não foi possível carregar as obras."
+            errorMessage =
+                throwable.message
+                    ?: "Não foi possível carregar as obras."
         } finally {
             loading = false
         }
     }
 
-    val normalizedQuery = query.trim()
+    val normalizedQuery =
+        query.trim()
 
     val visibleMangas = remember(
         mangas,
@@ -127,31 +138,24 @@ fun HomeScreen(
     val featuredMangas =
         visibleMangas.take(8)
 
-    val recentMangas =
+    val exploreMangas =
         visibleMangas
-            .drop(8)
-            .take(8)
-            .ifEmpty {
-                featuredMangas
-            }
-
-    val popularMangas =
-        visibleMangas
-            .drop(16)
-            .take(8)
-            .ifEmpty {
-                featuredMangas
-            }
+            .drop(featuredMangas.size)
+            .take(12)
 
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            bottom = 40.dp
+        ),
         verticalArrangement =
-            Arrangement.spacedBy(8.dp)
+            Arrangement.spacedBy(12.dp)
     ) {
         item {
             MiraiHeader(
-                title = "MIRAI"
+                title = "MIRAI",
+                subtitle = source.name
             ) {
                 HomeSearchBar(
                     value = query,
@@ -173,22 +177,35 @@ fun HomeScreen(
         if (lastReading != null) {
             item {
                 ContinueReadingCard(
-                    title = lastReading.mangaTitle,
-                    chapter = lastReading.chapterName,
-                    coverUrl = lastReading.mangaCoverUrl,
+                    title =
+                        lastReading.mangaTitle,
+                    chapter =
+                        lastReading.chapterName,
+                    coverUrl =
+                        lastReading.mangaCoverUrl,
                     currentPage =
                         lastReading.pageIndex + 1,
                     totalPages =
                         lastReading.totalPages,
                     onClick = {
+                        val chapter = Chapter(
+                            id =
+                                lastReading.chapterId,
+                            mangaId =
+                                lastReading.mangaId,
+                            name =
+                                lastReading.chapterName,
+                            number =
+                                extractChapterNumber(
+                                    lastReading.chapterName
+                                ),
+                            url =
+                                lastReading.chapterId
+                        )
+
                         onContinueReadingClick(
-                            Chapter(
-                                id = lastReading.chapterId,
-                                mangaId = lastReading.mangaId,
-                                name = lastReading.chapterName,
-                                number = 0.0,
-                                url = lastReading.chapterId
-                            )
+                            chapter,
+                            lastReading.sourceId
                         )
                     }
                 )
@@ -210,7 +227,8 @@ fun HomeScreen(
                         CircularProgressIndicator()
 
                         Text(
-                            text = "Carregando obras...",
+                            text =
+                                "Carregando ${source.name}...",
                             modifier = Modifier.padding(
                                 top = 12.dp
                             )
@@ -233,7 +251,9 @@ fun HomeScreen(
                         Text(
                             text = errorMessage!!,
                             color =
-                                MaterialTheme.colorScheme.error
+                                MaterialTheme
+                                    .colorScheme
+                                    .error
                         )
 
                         Button(
@@ -244,7 +264,9 @@ fun HomeScreen(
                                 top = 16.dp
                             )
                         ) {
-                            Text("Tentar novamente")
+                            Text(
+                                text = "Tentar novamente"
+                            )
                         }
                     }
                 }
@@ -261,39 +283,50 @@ fun HomeScreen(
             }
 
             else -> {
-                item {
-                    HomeSection(
-                        title = "Em destaque"
-                    ) {
-                        MangaHorizontalRow(
-                            mangas = featuredMangas,
-                            onMangaClick = onMangaClick
-                        )
+                if (featuredMangas.isNotEmpty()) {
+                    item {
+                        HomeSection(
+                            title = "Destaques"
+                        ) {
+                            MangaHorizontalRow(
+                                mangas =
+                                    featuredMangas,
+                                onMangaClick =
+                                    onMangaClick
+                            )
+                        }
                     }
                 }
 
-                item {
-                    HomeSection(
-                        title = "Recentes"
-                    ) {
-                        MangaHorizontalRow(
-                            mangas = recentMangas,
-                            onMangaClick = onMangaClick
-                        )
-                    }
-                }
-
-                item {
-                    HomeSection(
-                        title = "Populares"
-                    ) {
-                        MangaHorizontalRow(
-                            mangas = popularMangas,
-                            onMangaClick = onMangaClick
-                        )
+                if (exploreMangas.isNotEmpty()) {
+                    item {
+                        HomeSection(
+                            title =
+                                "Explore na ${source.name}"
+                        ) {
+                            MangaHorizontalRow(
+                                mangas =
+                                    exploreMangas,
+                                onMangaClick =
+                                    onMangaClick
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+private fun extractChapterNumber(
+    chapterName: String
+): Double {
+    return Regex(
+        pattern = """\d+(?:[.,]\d+)?"""
+    )
+        .find(chapterName)
+        ?.value
+        ?.replace(",", ".")
+        ?.toDoubleOrNull()
+        ?: 0.0
 }

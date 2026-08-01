@@ -58,11 +58,38 @@ private const val PRELOAD_DISTANCE = 3
 @Composable
 fun ReaderScreen(
     chapter: Chapter,
+    chapters: List<Chapter>,
+    onChapterSelected: (Chapter) -> Unit,
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val applicationContext = context.applicationContext
+    val applicationContext =
+        context.applicationContext
+
     val view = LocalView.current
+
+    val orderedChapters = remember(chapters) {
+        chapters.sortedBy { item ->
+            item.number
+        }
+    }
+
+    val currentChapterIndex = remember(
+        chapter.id,
+        orderedChapters
+    ) {
+        orderedChapters.indexOfFirst { item ->
+            item.id == chapter.id
+        }
+    }
+
+    val previousChapter = orderedChapters.getOrNull(
+        currentChapterIndex - 1
+    )
+
+    val nextChapter = orderedChapters.getOrNull(
+        currentChapterIndex + 1
+    )
 
     val activity = remember(context) {
         context.findActivity()
@@ -85,11 +112,15 @@ fun ReaderScreen(
     }
 
     var preferences by remember {
-        mutableStateOf(settingsStore.load())
+        mutableStateOf(
+            settingsStore.load()
+        )
     }
 
     var pages by remember(chapter.id) {
-        mutableStateOf<List<ReaderPage>>(emptyList())
+        mutableStateOf<List<ReaderPage>>(
+            emptyList()
+        )
     }
 
     var isLoading by remember(chapter.id) {
@@ -110,22 +141,43 @@ fun ReaderScreen(
 
     var currentPageIndex by remember(chapter.id) {
         mutableIntStateOf(
-            progressStore.getPage(chapter.id)
+            progressStore.getPage(
+                chapter.id
+            )
         )
     }
 
-    var requestedPage by remember {
+    var requestedPage by remember(chapter.id) {
         mutableStateOf<Int?>(null)
     }
 
-    val backgroundColor = when (preferences.background) {
-        ReaderBackground.BLACK -> Color.Black
-        ReaderBackground.GRAY -> Color(0xFF444444)
-        ReaderBackground.WHITE -> Color.White
+    var automaticChapterChangeStarted by remember(
+        chapter.id
+    ) {
+        mutableStateOf(false)
+    }
+
+    val backgroundColor = when (
+        preferences.background
+    ) {
+        ReaderBackground.BLACK -> {
+            Color.Black
+        }
+
+        ReaderBackground.GRAY -> {
+            Color(0xFF444444)
+        }
+
+        ReaderBackground.WHITE -> {
+            Color.White
+        }
     }
 
     val foregroundColor =
-        if (preferences.background == ReaderBackground.WHITE) {
+        if (
+            preferences.background ==
+            ReaderBackground.WHITE
+        ) {
             Color.Black
         } else {
             Color.White
@@ -135,7 +187,8 @@ fun ReaderScreen(
         preferences.keepScreenOn,
         view
     ) {
-        val previousKeepScreenOn = view.keepScreenOn
+        val previousKeepScreenOn =
+            view.keepScreenOn
 
         view.keepScreenOn =
             preferences.keepScreenOn
@@ -212,7 +265,9 @@ fun ReaderScreen(
     }
 
     LaunchedEffect(preferences) {
-        settingsStore.save(preferences)
+        settingsStore.save(
+            preferences
+        )
     }
 
     LaunchedEffect(chapter.id) {
@@ -222,9 +277,11 @@ fun ReaderScreen(
 
         runCatching {
             withContext(Dispatchers.IO) {
-                SourceRepository.currentSource.getPages(
-                    chapter = chapter
-                )
+                SourceRepository
+                    .currentSource
+                    .getPages(
+                        chapter = chapter
+                    )
             }
         }.onSuccess { result ->
             pages = result
@@ -233,7 +290,8 @@ fun ReaderScreen(
                 currentPageIndex.coerceIn(
                     minimumValue = 0,
                     maximumValue =
-                        result.lastIndex.coerceAtLeast(0)
+                        result.lastIndex
+                            .coerceAtLeast(0)
                 )
 
             Log.d(
@@ -266,7 +324,8 @@ fun ReaderScreen(
                 pageIndex =
                     currentPageIndex.coerceIn(
                         minimumValue = 0,
-                        maximumValue = pages.lastIndex
+                        maximumValue =
+                            pages.lastIndex
                     ),
                 totalPages = pages.size
             )
@@ -284,14 +343,23 @@ fun ReaderScreen(
 
         val startIndex =
             (currentPageIndex + 1)
-                .coerceAtMost(pages.lastIndex)
+                .coerceAtMost(
+                    pages.lastIndex
+                )
 
         val endIndex =
-            (currentPageIndex + PRELOAD_DISTANCE)
-                .coerceAtMost(pages.lastIndex)
+            (
+                    currentPageIndex +
+                            PRELOAD_DISTANCE
+                    )
+                .coerceAtMost(
+                    pages.lastIndex
+                )
 
         if (startIndex <= endIndex) {
-            for (index in startIndex..endIndex) {
+            for (
+            index in startIndex..endIndex
+            ) {
                 runCatching {
                     imageDownloader.download(
                         pages[index].imageUrl
@@ -304,7 +372,9 @@ fun ReaderScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor)
+            .background(
+                backgroundColor
+            )
     ) {
         when {
             isLoading -> {
@@ -313,19 +383,27 @@ fun ReaderScreen(
 
             errorMessage != null -> {
                 ReaderErrorContent(
-                    message = errorMessage!!
+                    message =
+                        errorMessage!!
                 )
             }
 
             pages.isEmpty() -> {
                 Text(
-                    text = "Nenhuma página foi encontrada.",
+                    text =
+                        "Nenhuma página foi encontrada.",
                     modifier = Modifier
-                        .align(Alignment.Center)
+                        .align(
+                            Alignment.Center
+                        )
                         .padding(24.dp),
                     color = foregroundColor,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyLarge,
+                    textAlign =
+                        TextAlign.Center
                 )
             }
 
@@ -343,12 +421,38 @@ fun ReaderScreen(
                         imageDownloader,
                     backgroundColor =
                         backgroundColor,
+
                     onPageChanged = { pageIndex ->
-                        currentPageIndex = pageIndex
+                        currentPageIndex =
+                            pageIndex
                     },
+
                     onRequestedPageConsumed = {
                         requestedPage = null
                     },
+
+                    onEndReached = {
+                        if (
+                            !automaticChapterChangeStarted
+                        ) {
+                            val chapterToOpen =
+                                nextChapter
+
+                            if (chapterToOpen != null) {
+                                automaticChapterChangeStarted =
+                                    true
+
+                                progressStore.markViewed(
+                                    chapter.id
+                                )
+
+                                onChapterSelected(
+                                    chapterToOpen
+                                )
+                            }
+                        }
+                    },
+
                     onTap = {
                         controlsVisible =
                             !controlsVisible
@@ -371,10 +475,12 @@ fun ReaderScreen(
                 chapterName = chapter.name,
                 currentPage =
                     currentPageIndex + 1,
-                totalPages = pages.size,
+                totalPages =
+                    pages.size,
                 showPageNumber =
                     preferences.showPageNumber,
-                onBackClick = onBackClick
+                onBackClick =
+                    onBackClick
             )
         }
 
@@ -392,10 +498,48 @@ fun ReaderScreen(
             ReaderBottomBar(
                 currentPage =
                     currentPageIndex,
-                totalPages = pages.size,
+                totalPages =
+                    pages.size,
+                hasPreviousChapter =
+                    previousChapter != null,
+                hasNextChapter =
+                    nextChapter != null,
+
                 onPageSelected = { pageIndex ->
-                    requestedPage = pageIndex
+                    requestedPage =
+                        pageIndex
                 },
+
+                onPreviousChapterClick = {
+                    previousChapter?.let {
+                            chapterToOpen ->
+
+                        automaticChapterChangeStarted =
+                            true
+
+                        onChapterSelected(
+                            chapterToOpen
+                        )
+                    }
+                },
+
+                onNextChapterClick = {
+                    nextChapter?.let {
+                            chapterToOpen ->
+
+                        automaticChapterChangeStarted =
+                            true
+
+                        progressStore.markViewed(
+                            chapter.id
+                        )
+
+                        onChapterSelected(
+                            chapterToOpen
+                        )
+                    }
+                },
+
                 onSettingsClick = {
                     settingsVisible = true
                 }
@@ -405,10 +549,16 @@ fun ReaderScreen(
 
     if (settingsVisible) {
         ReaderSettingsSheet(
-            preferences = preferences,
-            onPreferencesChange = { newPreferences ->
-                preferences = newPreferences
+            preferences =
+                preferences,
+
+            onPreferencesChange = {
+                    newPreferences ->
+
+                preferences =
+                    newPreferences
             },
+
             onDismiss = {
                 settingsVisible = false
             }
@@ -427,6 +577,7 @@ private fun ReaderModeContent(
     backgroundColor: Color,
     onPageChanged: (Int) -> Unit,
     onRequestedPageConsumed: () -> Unit,
+    onEndReached: () -> Unit,
     onTap: () -> Unit
 ) {
     when (mode) {
@@ -435,15 +586,24 @@ private fun ReaderModeContent(
             LongStripReader(
                 pages = pages,
                 mode = mode,
-                gapDp = longStripGapDp,
-                initialPage = initialPage,
-                requestedPage = requestedPage,
-                imageDownloader = imageDownloader,
-                backgroundColor = backgroundColor,
-                onPageChanged = onPageChanged,
+                gapDp =
+                    longStripGapDp,
+                initialPage =
+                    initialPage,
+                requestedPage =
+                    requestedPage,
+                imageDownloader =
+                    imageDownloader,
+                backgroundColor =
+                    backgroundColor,
+                onPageChanged =
+                    onPageChanged,
                 onRequestedPageConsumed =
                     onRequestedPageConsumed,
-                onTap = onTap
+                onEndReached =
+                    onEndReached,
+                onTap =
+                    onTap
             )
         }
 
@@ -452,28 +612,40 @@ private fun ReaderModeContent(
             HorizontalPagedReader(
                 pages = pages,
                 mode = mode,
-                initialPage = initialPage,
-                requestedPage = requestedPage,
-                imageDownloader = imageDownloader,
-                backgroundColor = backgroundColor,
-                onPageChanged = onPageChanged,
+                initialPage =
+                    initialPage,
+                requestedPage =
+                    requestedPage,
+                imageDownloader =
+                    imageDownloader,
+                backgroundColor =
+                    backgroundColor,
+                onPageChanged =
+                    onPageChanged,
                 onRequestedPageConsumed =
                     onRequestedPageConsumed,
-                onTap = onTap
+                onTap =
+                    onTap
             )
         }
 
         ReaderMode.PAGED_VERTICAL -> {
             VerticalPagedReader(
                 pages = pages,
-                initialPage = initialPage,
-                requestedPage = requestedPage,
-                imageDownloader = imageDownloader,
-                backgroundColor = backgroundColor,
-                onPageChanged = onPageChanged,
+                initialPage =
+                    initialPage,
+                requestedPage =
+                    requestedPage,
+                imageDownloader =
+                    imageDownloader,
+                backgroundColor =
+                    backgroundColor,
+                onPageChanged =
+                    onPageChanged,
                 onRequestedPageConsumed =
                     onRequestedPageConsumed,
-                onTap = onTap
+                onTap =
+                    onTap
             )
         }
     }
@@ -481,12 +653,16 @@ private fun ReaderModeContent(
 
 private tailrec fun Context.findActivity(): Activity? {
     return when (this) {
-        is Activity -> this
+        is Activity -> {
+            this
+        }
 
         is ContextWrapper -> {
             baseContext.findActivity()
         }
 
-        else -> null
+        else -> {
+            null
+        }
     }
 }

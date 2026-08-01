@@ -1,6 +1,5 @@
 package com.andrews.mirai.presentation.reader.mode
 
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,8 +8,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.andrews.mirai.domain.model.ReaderPage
@@ -32,6 +36,7 @@ fun LongStripReader(
     backgroundColor: Color,
     onPageChanged: (Int) -> Unit,
     onRequestedPageConsumed: () -> Unit,
+    onEndReached: () -> Unit,
     onTap: () -> Unit
 ) {
     val safeInitialPage = initialPage.coerceIn(
@@ -45,6 +50,14 @@ fun LongStripReader(
 
     val zoomableState = rememberZoomableState()
 
+    var userScrolled by remember(pages) {
+        mutableStateOf(false)
+    }
+
+    var endReported by remember(pages) {
+        mutableStateOf(false)
+    }
+
     LaunchedEffect(listState) {
         snapshotFlow {
             listState.firstVisibleItemIndex
@@ -52,6 +65,55 @@ fun LongStripReader(
             .distinctUntilChanged()
             .collect { pageIndex ->
                 onPageChanged(pageIndex)
+            }
+    }
+
+    LaunchedEffect(listState, pages) {
+        snapshotFlow {
+            listState.isScrollInProgress
+        }
+            .distinctUntilChanged()
+            .collect { isScrolling ->
+                if (isScrolling) {
+                    userScrolled = true
+                }
+            }
+    }
+
+    LaunchedEffect(
+        listState,
+        pages,
+        userScrolled
+    ) {
+        snapshotFlow {
+            val layoutInfo =
+                listState.layoutInfo
+
+            val lastVisibleItem =
+                layoutInfo.visibleItemsInfo
+                    .lastOrNull()
+
+            val lastPageFullyVisible =
+                lastVisibleItem != null &&
+                        lastVisibleItem.index ==
+                        pages.lastIndex &&
+                        lastVisibleItem.offset +
+                        lastVisibleItem.size <=
+                        layoutInfo.viewportEndOffset
+
+            userScrolled &&
+                    lastPageFullyVisible &&
+                    !listState.isScrollInProgress
+        }
+            .distinctUntilChanged()
+            .collect { reachedEnd ->
+                if (
+                    reachedEnd &&
+                    !endReported
+                ) {
+                    endReported = true
+                    onEndReached()
+                }
             }
     }
 
@@ -74,7 +136,7 @@ fun LongStripReader(
             .clipToBounds()
             .zoomable(
                 state = zoomableState,
-                onClick = { _ ->
+                onClick = {
                     onTap()
                 }
             )
@@ -83,8 +145,13 @@ fun LongStripReader(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             verticalArrangement =
-                if (mode == ReaderMode.LONG_STRIP_GAPS) {
-                    Arrangement.spacedBy(gapDp.dp)
+                if (
+                    mode ==
+                    ReaderMode.LONG_STRIP_GAPS
+                ) {
+                    Arrangement.spacedBy(
+                        gapDp.dp
+                    )
                 } else {
                     Arrangement.Top
                 }
@@ -97,9 +164,11 @@ fun LongStripReader(
             ) { page ->
                 ReaderPageContent(
                     page = page,
-                    imageDownloader = imageDownloader,
+                    imageDownloader =
+                        imageDownloader,
                     paged = false,
-                    backgroundColor = backgroundColor,
+                    backgroundColor =
+                        backgroundColor,
                     onTap = {}
                 )
             }

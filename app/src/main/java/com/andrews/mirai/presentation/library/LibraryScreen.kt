@@ -10,7 +10,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,7 +40,11 @@ fun LibraryScreen(
     ) {
         MiraiHeader(
             title = "Biblioteca",
-            subtitle = "Suas obras favoritas"
+            subtitle = if (favorites.isEmpty()) {
+                "Suas obras favoritas"
+            } else {
+                "${favorites.size} obra(s) favorita(s)"
+            }
         )
 
         if (favorites.isEmpty()) {
@@ -64,14 +70,49 @@ fun LibraryScreen(
                         manga.id
                     }
                 ) { manga ->
-                    MangaCard(
+                    FavoriteMangaCard(
                         manga = manga,
-                        onClick = {
+                        onMangaClick = {
                             onMangaClick(manga)
+                        },
+                        onRemoveFavorite = {
+                            FavoriteStore.toggleFavorite(
+                                manga
+                            )
                         }
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteMangaCard(
+    manga: Manga,
+    onMangaClick: () -> Unit,
+    onRemoveFavorite: () -> Unit
+) {
+    Box {
+        MangaCard(
+            manga = manga,
+            onClick = onMangaClick
+        )
+
+        FilledIconButton(
+            onClick = onRemoveFavorite,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+        ) {
+            Icon(
+                imageVector =
+                    Icons.Filled.Favorite,
+                contentDescription =
+                    "Remover ${manga.title} dos favoritos",
+                tint =
+                    MaterialTheme.colorScheme.onPrimary
+            )
         }
     }
 }
@@ -93,25 +134,37 @@ private fun EmptyLibrary(
                     Icons.Outlined.FavoriteBorder,
                 contentDescription = null,
                 tint =
-                    MaterialTheme.colorScheme
+                    MaterialTheme
+                        .colorScheme
                         .onSurfaceVariant
             )
 
             Text(
-                text = "Sua biblioteca ainda está vazia.",
+                text =
+                    "Sua biblioteca ainda está vazia.",
                 style =
-                    MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 12.dp)
+                    MaterialTheme
+                        .typography
+                        .titleMedium,
+                modifier = Modifier.padding(
+                    top = 12.dp
+                )
             )
 
             Text(
-                text = "Favorite uma obra para encontrá-la aqui.",
+                text =
+                    "Favorite uma obra para encontrá-la aqui.",
                 style =
-                    MaterialTheme.typography.bodyMedium,
+                    MaterialTheme
+                        .typography
+                        .bodyMedium,
                 color =
-                    MaterialTheme.colorScheme
+                    MaterialTheme
+                        .colorScheme
                         .onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(
+                    top = 6.dp
+                )
             )
         }
     }
