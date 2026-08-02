@@ -1,13 +1,16 @@
 package com.andrews.mirai.data.source
 
-import com.andrews.mirai.data.source.mangalivre.MangaLivreSource
 import com.andrews.mirai.data.source.astratoons.AstralToonsSource
+import com.andrews.mirai.data.source.mangalivre.MangaLivreSource
+import com.andrews.mirai.data.source.niadd.NiaddSource
 
 object SourceRegistry {
 
-    private val registeredSources: List<MangaSource> = listOf(
+    private val registeredSources:
+            List<MangaSource> = listOf(
         MangaLivreSource(),
-        AstralToonsSource()
+        AstralToonsSource(),
+        NiaddSource()
     )
 
     fun all(): List<MangaSource> {
@@ -21,8 +24,9 @@ object SourceRegistry {
     fun findById(
         sourceId: String
     ): MangaSource? {
-        return registeredSources.firstOrNull { source ->
-            source.id == sourceId
-        }
+        return registeredSources
+            .firstOrNull { source ->
+                source.id == sourceId
+            }
     }
 }
