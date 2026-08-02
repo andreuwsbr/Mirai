@@ -1,13 +1,7 @@
 package com.andrews.mirai.presentation.reader
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -26,34 +19,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageCache
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
-import com.andrews.mirai.presentation.reader.components.ReaderBottomBar
 import com.andrews.mirai.presentation.reader.components.ReaderErrorContent
 import com.andrews.mirai.presentation.reader.components.ReaderLoadingContent
-import com.andrews.mirai.presentation.reader.components.ReaderTopBar
-import com.andrews.mirai.presentation.reader.mode.HorizontalPagedReader
-import com.andrews.mirai.presentation.reader.mode.LongStripReader
-import com.andrews.mirai.presentation.reader.mode.VerticalPagedReader
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import com.andrews.mirai.presentation.reader.settings.ReaderBackground
-import com.andrews.mirai.presentation.reader.settings.ReaderMode
 import com.andrews.mirai.presentation.reader.settings.ReaderSettingsSheet
 import com.andrews.mirai.presentation.reader.settings.ReaderSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private const val IMAGE_LOG_TAG = "MIRAI_IMAGE"
-private const val PRELOAD_DISTANCE = 3
+private const val IMAGE_LOG_TAG =
+    "MIRAI_IMAGE"
+
+private const val PRELOAD_DISTANCE =
+    3
 
 @Composable
 fun ReaderScreen(
@@ -62,11 +48,8 @@ fun ReaderScreen(
     onChapterSelected: (Chapter) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
     val applicationContext =
-        context.applicationContext
-
-    val view = LocalView.current
+        LocalContext.current.applicationContext
 
     val orderedChapters = remember(chapters) {
         chapters.sortedBy { item ->
@@ -83,17 +66,15 @@ fun ReaderScreen(
         }
     }
 
-    val previousChapter = orderedChapters.getOrNull(
-        currentChapterIndex - 1
-    )
+    val previousChapter =
+        orderedChapters.getOrNull(
+            currentChapterIndex - 1
+        )
 
-    val nextChapter = orderedChapters.getOrNull(
-        currentChapterIndex + 1
-    )
-
-    val activity = remember(context) {
-        context.findActivity()
-    }
+    val nextChapter =
+        orderedChapters.getOrNull(
+            currentChapterIndex + 1
+        )
 
     val progressStore = remember(applicationContext) {
         ReadingProgressStore(applicationContext)
@@ -183,78 +164,12 @@ fun ReaderScreen(
             Color.White
         }
 
-    DisposableEffect(
-        preferences.keepScreenOn,
-        view
-    ) {
-        val previousKeepScreenOn =
-            view.keepScreenOn
-
-        view.keepScreenOn =
-            preferences.keepScreenOn
-
-        onDispose {
-            view.keepScreenOn =
-                previousKeepScreenOn
-        }
-    }
-
-    DisposableEffect(
-        preferences.fullscreen,
-        activity
-    ) {
-        val window = activity?.window
-
-        if (window != null) {
-            val controller =
-                WindowCompat.getInsetsController(
-                    window,
-                    window.decorView
-                )
-
-            if (preferences.fullscreen) {
-                WindowCompat.setDecorFitsSystemWindows(
-                    window,
-                    false
-                )
-
-                controller.hide(
-                    WindowInsetsCompat.Type.systemBars()
-                )
-
-                controller.systemBarsBehavior =
-                    WindowInsetsControllerCompat
-                        .BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } else {
-                WindowCompat.setDecorFitsSystemWindows(
-                    window,
-                    true
-                )
-
-                controller.show(
-                    WindowInsetsCompat.Type.systemBars()
-                )
-            }
-        }
-
-        onDispose {
-            if (window != null) {
-                WindowCompat.setDecorFitsSystemWindows(
-                    window,
-                    true
-                )
-
-                WindowCompat
-                    .getInsetsController(
-                        window,
-                        window.decorView
-                    )
-                    .show(
-                        WindowInsetsCompat.Type.systemBars()
-                    )
-            }
-        }
-    }
+    ReaderSystemUiEffects(
+        keepScreenOn =
+            preferences.keepScreenOn,
+        fullscreen =
+            preferences.fullscreen
+    )
 
     BackHandler {
         if (settingsVisible) {
@@ -351,15 +266,12 @@ fun ReaderScreen(
             (
                     currentPageIndex +
                             PRELOAD_DISTANCE
-                    )
-                .coerceAtMost(
+                    ).coerceAtMost(
                     pages.lastIndex
                 )
 
         if (startIndex <= endIndex) {
-            for (
-            index in startIndex..endIndex
-            ) {
+            for (index in startIndex..endIndex) {
                 runCatching {
                     imageDownloader.download(
                         pages[index].imageUrl
@@ -384,7 +296,7 @@ fun ReaderScreen(
             errorMessage != null -> {
                 ReaderErrorContent(
                     message =
-                        errorMessage!!
+                        errorMessage.orEmpty()
                 )
             }
 
@@ -393,17 +305,14 @@ fun ReaderScreen(
                     text =
                         "Nenhuma página foi encontrada.",
                     modifier = Modifier
-                        .align(
-                            Alignment.Center
-                        )
+                        .align(Alignment.Center)
                         .padding(24.dp),
                     color = foregroundColor,
                     style =
                         MaterialTheme
                             .typography
                             .bodyLarge,
-                    textAlign =
-                        TextAlign.Center
+                    textAlign = TextAlign.Center
                 )
             }
 
@@ -421,16 +330,13 @@ fun ReaderScreen(
                         imageDownloader,
                     backgroundColor =
                         backgroundColor,
-
                     onPageChanged = { pageIndex ->
                         currentPageIndex =
                             pageIndex
                     },
-
                     onRequestedPageConsumed = {
                         requestedPage = null
                     },
-
                     onEndReached = {
                         if (
                             !automaticChapterChangeStarted
@@ -452,7 +358,6 @@ fun ReaderScreen(
                             }
                         }
                     },
-
                     onTap = {
                         controlsVisible =
                             !controlsVisible
@@ -461,208 +366,77 @@ fun ReaderScreen(
             }
         }
 
-        AnimatedVisibility(
-            visible =
-                controlsVisible &&
-                        !settingsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(
-                Alignment.TopCenter
-            )
-        ) {
-            ReaderTopBar(
-                chapterName = chapter.name,
-                currentPage =
-                    currentPageIndex + 1,
-                totalPages =
-                    pages.size,
-                showPageNumber =
-                    preferences.showPageNumber,
-                onBackClick =
-                    onBackClick
-            )
-        }
+        ReaderControls(
+            controlsVisible =
+                controlsVisible,
+            settingsVisible =
+                settingsVisible,
+            pagesAvailable =
+                pages.isNotEmpty(),
+            chapterName =
+                chapter.name,
+            currentPageIndex =
+                currentPageIndex,
+            totalPages =
+                pages.size,
+            showPageNumber =
+                preferences.showPageNumber,
+            hasPreviousChapter =
+                previousChapter != null,
+            hasNextChapter =
+                nextChapter != null,
+            onBackClick =
+                onBackClick,
+            onPageSelected = { pageIndex ->
+                requestedPage =
+                    pageIndex
+            },
+            onPreviousChapterClick = {
+                previousChapter?.let {
+                        chapterToOpen ->
 
-        AnimatedVisibility(
-            visible =
-                controlsVisible &&
-                        !settingsVisible &&
-                        pages.isNotEmpty(),
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(
-                Alignment.BottomCenter
-            )
-        ) {
-            ReaderBottomBar(
-                currentPage =
-                    currentPageIndex,
-                totalPages =
-                    pages.size,
-                hasPreviousChapter =
-                    previousChapter != null,
-                hasNextChapter =
-                    nextChapter != null,
+                    automaticChapterChangeStarted =
+                        true
 
-                onPageSelected = { pageIndex ->
-                    requestedPage =
-                        pageIndex
-                },
-
-                onPreviousChapterClick = {
-                    previousChapter?.let {
-                            chapterToOpen ->
-
-                        automaticChapterChangeStarted =
-                            true
-
-                        onChapterSelected(
-                            chapterToOpen
-                        )
-                    }
-                },
-
-                onNextChapterClick = {
-                    nextChapter?.let {
-                            chapterToOpen ->
-
-                        automaticChapterChangeStarted =
-                            true
-
-                        progressStore.markViewed(
-                            chapter.id
-                        )
-
-                        onChapterSelected(
-                            chapterToOpen
-                        )
-                    }
-                },
-
-                onSettingsClick = {
-                    settingsVisible = true
+                    onChapterSelected(
+                        chapterToOpen
+                    )
                 }
-            )
-        }
+            },
+            onNextChapterClick = {
+                nextChapter?.let {
+                        chapterToOpen ->
+
+                    automaticChapterChangeStarted =
+                        true
+
+                    progressStore.markViewed(
+                        chapter.id
+                    )
+
+                    onChapterSelected(
+                        chapterToOpen
+                    )
+                }
+            },
+            onSettingsClick = {
+                settingsVisible = true
+            }
+        )
     }
 
     if (settingsVisible) {
         ReaderSettingsSheet(
-            preferences =
-                preferences,
-
+            preferences = preferences,
             onPreferencesChange = {
                     newPreferences ->
 
                 preferences =
                     newPreferences
             },
-
             onDismiss = {
                 settingsVisible = false
             }
         )
-    }
-}
-
-@Composable
-private fun ReaderModeContent(
-    pages: List<ReaderPage>,
-    mode: ReaderMode,
-    longStripGapDp: Int,
-    initialPage: Int,
-    requestedPage: Int?,
-    imageDownloader: ReaderImageDownloader,
-    backgroundColor: Color,
-    onPageChanged: (Int) -> Unit,
-    onRequestedPageConsumed: () -> Unit,
-    onEndReached: () -> Unit,
-    onTap: () -> Unit
-) {
-    when (mode) {
-        ReaderMode.LONG_STRIP,
-        ReaderMode.LONG_STRIP_GAPS -> {
-            LongStripReader(
-                pages = pages,
-                mode = mode,
-                gapDp =
-                    longStripGapDp,
-                initialPage =
-                    initialPage,
-                requestedPage =
-                    requestedPage,
-                imageDownloader =
-                    imageDownloader,
-                backgroundColor =
-                    backgroundColor,
-                onPageChanged =
-                    onPageChanged,
-                onRequestedPageConsumed =
-                    onRequestedPageConsumed,
-                onEndReached =
-                    onEndReached,
-                onTap =
-                    onTap
-            )
-        }
-
-        ReaderMode.PAGED_LEFT_TO_RIGHT,
-        ReaderMode.PAGED_RIGHT_TO_LEFT -> {
-            HorizontalPagedReader(
-                pages = pages,
-                mode = mode,
-                initialPage =
-                    initialPage,
-                requestedPage =
-                    requestedPage,
-                imageDownloader =
-                    imageDownloader,
-                backgroundColor =
-                    backgroundColor,
-                onPageChanged =
-                    onPageChanged,
-                onRequestedPageConsumed =
-                    onRequestedPageConsumed,
-                onTap =
-                    onTap
-            )
-        }
-
-        ReaderMode.PAGED_VERTICAL -> {
-            VerticalPagedReader(
-                pages = pages,
-                initialPage =
-                    initialPage,
-                requestedPage =
-                    requestedPage,
-                imageDownloader =
-                    imageDownloader,
-                backgroundColor =
-                    backgroundColor,
-                onPageChanged =
-                    onPageChanged,
-                onRequestedPageConsumed =
-                    onRequestedPageConsumed,
-                onTap =
-                    onTap
-            )
-        }
-    }
-}
-
-private tailrec fun Context.findActivity(): Activity? {
-    return when (this) {
-        is Activity -> {
-            this
-        }
-
-        is ContextWrapper -> {
-            baseContext.findActivity()
-        }
-
-        else -> {
-            null
-        }
     }
 }
