@@ -29,10 +29,13 @@ import com.andrews.mirai.presentation.components.MiraiHeader
 
 @Composable
 fun LibraryScreen(
-    onMangaClick: (Manga) -> Unit
+    onMangaClick: (
+        manga: Manga,
+        sourceId: String
+    ) -> Unit
 ) {
-    val favorites by FavoriteStore
-        .favorites
+    val favoriteEntries by FavoriteStore
+        .favoriteEntries
         .collectAsStateWithLifecycle()
 
     Column(
@@ -40,14 +43,15 @@ fun LibraryScreen(
     ) {
         MiraiHeader(
             title = "Biblioteca",
-            subtitle = if (favorites.isEmpty()) {
-                "Suas obras favoritas"
-            } else {
-                "${favorites.size} obra(s) favorita(s)"
-            }
+            subtitle =
+                if (favoriteEntries.isEmpty()) {
+                    "Suas obras favoritas"
+                } else {
+                    "${favoriteEntries.size} obra(s) favorita(s)"
+                }
         )
 
-        if (favorites.isEmpty()) {
+        if (favoriteEntries.isEmpty()) {
             EmptyLibrary(
                 modifier = Modifier.fillMaxSize()
             )
@@ -65,19 +69,26 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(
-                    items = favorites,
-                    key = { manga ->
-                        manga.id
+                    items = favoriteEntries,
+                    key = { entry ->
+                        "${entry.sourceId}|${entry.manga.id}"
                     }
-                ) { manga ->
+                ) { entry ->
+                    val manga = entry.manga
+                    val sourceId = entry.sourceId
+
                     FavoriteMangaCard(
                         manga = manga,
                         onMangaClick = {
-                            onMangaClick(manga)
+                            onMangaClick(
+                                manga,
+                                sourceId
+                            )
                         },
                         onRemoveFavorite = {
-                            FavoriteStore.toggleFavorite(
-                                manga
+                            FavoriteStore.removeFavorite(
+                                mangaId = manga.id,
+                                sourceId = sourceId
                             )
                         }
                     )

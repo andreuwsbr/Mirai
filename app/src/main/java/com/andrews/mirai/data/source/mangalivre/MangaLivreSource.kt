@@ -2,18 +2,19 @@ package com.andrews.mirai.data.source.mangalivre
 
 import com.andrews.mirai.data.source.madara.MadaraSource
 import com.andrews.mirai.data.source.madara.MadaraSourceConfig
+import com.andrews.mirai.data.source.mangalivre.parser.ChapterParser
+import com.andrews.mirai.data.source.mangalivre.parser.DetailsParser
+import com.andrews.mirai.data.source.mangalivre.parser.PageParser
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.domain.model.ReaderPage
 
 class MangaLivreSource : MadaraSource(
-
     config = MadaraSourceConfig(
-        id = "mangalivre",
-        name = "Manga Livre",
-        baseUrl = "https://mangalivre.blog"
+        id = MangaLivreConfig.ID,
+        name = MangaLivreConfig.NAME,
+        baseUrl = MangaLivreConfig.BASE_URL
     )
-
 ) {
 
     private val detailsParser by lazy {
@@ -105,12 +106,12 @@ class MangaLivreSource : MadaraSource(
 
         return when {
             normalizedValue.startsWith(
-                "https://",
+                prefix = "https://",
                 ignoreCase = true
             ) -> normalizedValue
 
             normalizedValue.startsWith(
-                "http://",
+                prefix = "http://",
                 ignoreCase = true
             ) -> normalizedValue
 

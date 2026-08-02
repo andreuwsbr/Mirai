@@ -59,9 +59,12 @@ fun HistoryScreen(
     val applicationContext =
         LocalContext.current.applicationContext
 
-    val progressStore = remember(applicationContext) {
-        ReadingProgressStore(applicationContext)
-    }
+    val progressStore =
+        remember(applicationContext) {
+            ReadingProgressStore(
+                applicationContext
+            )
+        }
 
     var refreshKey by remember {
         mutableIntStateOf(0)
@@ -84,11 +87,12 @@ fun HistoryScreen(
     ) {
         MiraiHeader(
             title = "Histórico",
-            subtitle = if (history.isEmpty()) {
-                "Continue exatamente de onde parou"
-            } else {
-                "${history.size} obra(s) no histórico"
-            }
+            subtitle =
+                if (history.isEmpty()) {
+                    "Continue exatamente de onde parou"
+                } else {
+                    "${history.size} obra(s) no histórico"
+                }
         )
 
         if (history.isEmpty()) {
@@ -107,7 +111,8 @@ fun HistoryScreen(
                     end = 20.dp,
                     bottom = 12.dp
                 ),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement =
+                Arrangement.End
         ) {
             OutlinedButton(
                 onClick = {
@@ -115,7 +120,8 @@ fun HistoryScreen(
                 }
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Delete,
+                    imageVector =
+                        Icons.Outlined.Delete,
                     contentDescription = null
                 )
 
@@ -142,7 +148,7 @@ fun HistoryScreen(
             items(
                 items = history,
                 key = { item ->
-                    item.mangaId
+                    "${item.sourceId}|${item.mangaId}"
                 }
             ) { item ->
                 HistoryCard(
@@ -152,9 +158,10 @@ fun HistoryScreen(
                             id = item.chapterId,
                             mangaId = item.mangaId,
                             name = item.chapterName,
-                            number = extractChapterNumber(
-                                item.chapterName
-                            ),
+                            number =
+                                extractChapterNumber(
+                                    item.chapterName
+                                ),
                             url = item.chapterId
                         )
 
@@ -164,9 +171,13 @@ fun HistoryScreen(
                         )
                     },
                     onRemoveClick = {
-                        progressStore.removeHistoryItem(
-                            item.mangaId
-                        )
+                        progressStore
+                            .removeHistoryItem(
+                                mangaId =
+                                    item.mangaId,
+                                sourceId =
+                                    item.sourceId
+                            )
 
                         refreshKey++
                     }
@@ -276,18 +287,22 @@ private fun HistoryCard(
                 modifier = Modifier.weight(1f)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    verticalAlignment =
+                        Alignment.Top
                 ) {
                     Text(
                         text = item.mangaTitle,
-                        modifier = Modifier.weight(1f),
+                        modifier =
+                            Modifier.weight(1f),
                         style =
                             MaterialTheme
                                 .typography
                                 .titleMedium,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow =
+                            TextOverflow.Ellipsis
                     )
 
                     IconButton(
@@ -315,11 +330,12 @@ private fun HistoryCard(
                 )
 
                 Text(
-                    text = if (safeTotalPages > 0) {
-                        "Página $currentPage de $safeTotalPages"
-                    } else {
-                        "Página $currentPage"
-                    },
+                    text =
+                        if (safeTotalPages > 0) {
+                            "Página $currentPage de $safeTotalPages"
+                        } else {
+                            "Página $currentPage"
+                        },
                     style =
                         MaterialTheme
                             .typography
@@ -332,7 +348,8 @@ private fun HistoryCard(
 
                 if (safeTotalPages > 0) {
                     Spacer(
-                        modifier = Modifier.height(6.dp)
+                        modifier =
+                            Modifier.height(6.dp)
                     )
 
                     LinearProgressIndicator(
@@ -342,7 +359,8 @@ private fun HistoryCard(
                                 maximumValue = 1f
                             )
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier =
+                            Modifier.fillMaxWidth()
                     )
                 }
 
@@ -351,9 +369,10 @@ private fun HistoryCard(
                 )
 
                 Text(
-                    text = formatReadDate(
-                        item.readAt
-                    ),
+                    text =
+                        formatReadDate(
+                            item.readAt
+                        ),
                     style =
                         MaterialTheme
                             .typography

@@ -214,7 +214,7 @@ private fun MainSettingsPage(
                         )
                     },
                     title = "Sobre",
-                    subtitle = "Versão 0.1.0",
+                    subtitle = "Versão ${com.andrews.mirai.BuildConfig.VERSION_NAME}",
                     onClick = onAboutClick
                 )
 

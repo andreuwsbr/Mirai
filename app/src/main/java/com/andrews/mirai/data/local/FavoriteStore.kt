@@ -1,6 +1,8 @@
 package com.andrews.mirai.data.local
 
 import android.content.Context
+import com.andrews.mirai.data.repository.SourceRepository
+import com.andrews.mirai.data.source.SourceRegistry
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.domain.model.MangaStatus
 import com.andrews.mirai.domain.model.MangaType
@@ -10,22 +12,47 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class FavoriteEntry(
+    val sourceId: String,
+    val manga: Manga
+)
+
 object FavoriteStore {
 
-    private const val PREFERENCES_NAME = "mirai_favorites"
-    private const val FAVORITES_KEY = "favorite_mangas"
+    private const val PREFERENCES_NAME =
+        "mirai_favorites"
+
+    private const val FAVORITES_KEY =
+        "favorite_mangas"
 
     private var initialized = false
 
     private lateinit var applicationContext: Context
 
+    private val _favoriteEntries =
+        MutableStateFlow<List<FavoriteEntry>>(
+            emptyList()
+        )
+
+    val favoriteEntries:
+            StateFlow<List<FavoriteEntry>> =
+        _favoriteEntries.asStateFlow()
+
+    /*
+     * Mantido temporariamente para que as telas antigas
+     * continuem funcionando durante a reorganização.
+     */
     private val _favorites =
-        MutableStateFlow<List<Manga>>(emptyList())
+        MutableStateFlow<List<Manga>>(
+            emptyList()
+        )
 
     val favorites: StateFlow<List<Manga>> =
         _favorites.asStateFlow()
 
-    fun initialize(context: Context) {
+    fun initialize(
+        context: Context
+    ) {
         if (initialized) {
             return
         }
@@ -35,101 +62,214 @@ object FavoriteStore {
 
         initialized = true
 
-        _favorites.value = loadFavorites()
+        publish(
+            loadFavoriteEntries()
+        )
     }
 
-    fun isFavorite(mangaId: String): Boolean {
-        return _favorites.value.any { manga ->
-            manga.id == mangaId
+    fun isFavorite(
+        mangaId: String
+    ): Boolean {
+        return _favoriteEntries.value.any { entry ->
+            entry.manga.id == mangaId
         }
     }
 
-    fun toggleFavorite(manga: Manga): Boolean {
+    fun isFavorite(
+        mangaId: String,
+        sourceId: String
+    ): Boolean {
+        return _favoriteEntries.value.any { entry ->
+            entry.manga.id == mangaId &&
+                    entry.sourceId == sourceId
+        }
+    }
+
+    fun toggleFavorite(
+        manga: Manga
+    ): Boolean {
+        return toggleFavorite(
+            manga = manga,
+            sourceId =
+                SourceRepository.currentSource.id
+        )
+    }
+
+    fun toggleFavorite(
+        manga: Manga,
+        sourceId: String
+    ): Boolean {
         ensureInitialized()
 
-        val currentFavorites =
-            _favorites.value.toMutableList()
+        val resolvedSourceId =
+            resolveSourceId(
+                savedSourceId = sourceId,
+                mangaId = manga.id
+            )
+
+        val currentEntries =
+            _favoriteEntries
+                .value
+                .toMutableList()
 
         val existingIndex =
-            currentFavorites.indexOfFirst { favorite ->
-                favorite.id == manga.id
+            currentEntries.indexOfFirst { entry ->
+                entry.manga.id == manga.id &&
+                        entry.sourceId ==
+                        resolvedSourceId
             }
 
         val isNowFavorite: Boolean
 
         if (existingIndex >= 0) {
-            currentFavorites.removeAt(existingIndex)
+            currentEntries.removeAt(
+                existingIndex
+            )
+
             isNowFavorite = false
         } else {
-            currentFavorites.add(
+            currentEntries.add(
                 index = 0,
-                element = manga
+                element = FavoriteEntry(
+                    sourceId =
+                        resolvedSourceId,
+                    manga = manga
+                )
             )
 
             isNowFavorite = true
         }
 
-        _favorites.value = currentFavorites
-
-        saveFavorites(currentFavorites)
+        publish(currentEntries)
+        saveFavoriteEntries(currentEntries)
 
         return isNowFavorite
     }
 
-    fun removeFavorite(mangaId: String) {
+    fun removeFavorite(
+        mangaId: String
+    ) {
         ensureInitialized()
 
-        val updatedFavorites =
-            _favorites.value.filterNot { manga ->
-                manga.id == mangaId
+        val updatedEntries =
+            _favoriteEntries.value.filterNot { entry ->
+                entry.manga.id == mangaId
             }
 
-        _favorites.value = updatedFavorites
+        publish(updatedEntries)
+        saveFavoriteEntries(updatedEntries)
+    }
 
-        saveFavorites(updatedFavorites)
+    fun removeFavorite(
+        mangaId: String,
+        sourceId: String
+    ) {
+        ensureInitialized()
+
+        val updatedEntries =
+            _favoriteEntries.value.filterNot { entry ->
+                entry.manga.id == mangaId &&
+                        entry.sourceId == sourceId
+            }
+
+        publish(updatedEntries)
+        saveFavoriteEntries(updatedEntries)
     }
 
     fun clearFavorites() {
         ensureInitialized()
 
-        _favorites.value = emptyList()
-
-        saveFavorites(emptyList())
+        publish(emptyList())
+        saveFavoriteEntries(emptyList())
     }
 
-    private fun loadFavorites(): List<Manga> {
+    private fun publish(
+        entries: List<FavoriteEntry>
+    ) {
+        val distinctEntries =
+            entries.distinctBy { entry ->
+                favoriteKey(
+                    sourceId = entry.sourceId,
+                    mangaId = entry.manga.id
+                )
+            }
+
+        _favoriteEntries.value =
+            distinctEntries
+
+        _favorites.value =
+            distinctEntries.map { entry ->
+                entry.manga
+            }
+    }
+
+    private fun loadFavoriteEntries():
+            List<FavoriteEntry> {
         val preferences =
             applicationContext.getSharedPreferences(
                 PREFERENCES_NAME,
                 Context.MODE_PRIVATE
             )
 
-        val json = preferences.getString(
-            FAVORITES_KEY,
-            null
-        ) ?: return emptyList()
+        val json =
+            preferences.getString(
+                FAVORITES_KEY,
+                null
+            ) ?: return emptyList()
 
         return runCatching {
             val jsonArray = JSONArray(json)
 
             buildList {
-                for (index in 0 until jsonArray.length()) {
+                for (
+                index in 0 until
+                        jsonArray.length()
+                ) {
                     val mangaObject =
                         jsonArray.optJSONObject(index)
                             ?: continue
 
-                    add(
+                    val manga =
                         jsonObjectToManga(
                             mangaObject
                         )
+
+                    if (
+                        manga.id.isBlank() ||
+                        manga.title.isBlank()
+                    ) {
+                        continue
+                    }
+
+                    val sourceId =
+                        resolveSourceId(
+                            savedSourceId =
+                                mangaObject.optString(
+                                    "sourceId"
+                                ),
+                            mangaId = manga.id
+                        )
+
+                    add(
+                        FavoriteEntry(
+                            sourceId = sourceId,
+                            manga = manga
+                        )
                     )
                 }
+            }.distinctBy { entry ->
+                favoriteKey(
+                    sourceId = entry.sourceId,
+                    mangaId = entry.manga.id
+                )
             }
-        }.getOrDefault(emptyList())
+        }.getOrDefault(
+            emptyList()
+        )
     }
 
-    private fun saveFavorites(
-        favorites: List<Manga>
+    private fun saveFavoriteEntries(
+        entries: List<FavoriteEntry>
     ) {
         val preferences =
             applicationContext.getSharedPreferences(
@@ -139,9 +279,11 @@ object FavoriteStore {
 
         val jsonArray = JSONArray()
 
-        favorites.forEach { manga ->
+        entries.forEach { entry ->
             jsonArray.put(
-                mangaToJsonObject(manga)
+                favoriteEntryToJsonObject(
+                    entry
+                )
             )
         }
 
@@ -154,13 +296,23 @@ object FavoriteStore {
             .apply()
     }
 
-    private fun mangaToJsonObject(
-        manga: Manga
+    private fun favoriteEntryToJsonObject(
+        entry: FavoriteEntry
     ): JSONObject {
+        val manga = entry.manga
+
         return JSONObject().apply {
+            put(
+                "sourceId",
+                entry.sourceId
+            )
+
             put("id", manga.id)
             put("title", manga.title)
-            put("description", manga.description)
+            put(
+                "description",
+                manga.description
+            )
             put("coverUrl", manga.coverUrl)
             put("author", manga.author)
             put("status", manga.status.name)
@@ -177,15 +329,19 @@ object FavoriteStore {
         jsonObject: JSONObject
     ): Manga {
         val genresArray =
-            jsonObject.optJSONArray("genres")
+            jsonObject.optJSONArray(
+                "genres"
+            )
 
         val genres = buildList {
             if (genresArray != null) {
                 for (
-                index in 0 until genresArray.length()
+                index in 0 until
+                        genresArray.length()
                 ) {
                     val genre =
-                        genresArray.optString(index)
+                        genresArray
+                            .optString(index)
                             .trim()
 
                     if (genre.isNotBlank()) {
@@ -197,9 +353,11 @@ object FavoriteStore {
 
         return Manga(
             id = jsonObject
-                .optString("id"),
+                .optString("id")
+                .trim(),
             title = jsonObject
-                .optString("title"),
+                .optString("title")
+                .trim(),
             description = jsonObject
                 .optString("description"),
             coverUrl = jsonObject
@@ -214,13 +372,68 @@ object FavoriteStore {
                     "Não informado"
                 ),
             status = parseStatus(
-                jsonObject.optString("status")
+                jsonObject.optString(
+                    "status"
+                )
             ),
             type = parseType(
-                jsonObject.optString("type")
+                jsonObject.optString(
+                    "type"
+                )
             ),
             genres = genres
         )
+    }
+
+    private fun resolveSourceId(
+        savedSourceId: String,
+        mangaId: String
+    ): String {
+        val normalizedSourceId =
+            savedSourceId.trim()
+
+        if (
+            normalizedSourceId.isNotBlank() &&
+            SourceRegistry.findById(
+                normalizedSourceId
+            ) != null
+        ) {
+            return normalizedSourceId
+        }
+
+        return detectSourceId(mangaId)
+    }
+
+    private fun detectSourceId(
+        mangaId: String
+    ): String {
+        val normalizedMangaId =
+            mangaId.lowercase()
+
+        return when {
+            normalizedMangaId.contains(
+                "mangalivre.blog"
+            ) -> {
+                "mangalivre"
+            }
+
+            normalizedMangaId.contains(
+                "astratoons.com"
+            ) -> {
+                "astraltoons"
+            }
+
+            else -> {
+                SourceRegistry.default().id
+            }
+        }
+    }
+
+    private fun favoriteKey(
+        sourceId: String,
+        mangaId: String
+    ): String {
+        return "$sourceId|$mangaId"
     }
 
     private fun parseStatus(

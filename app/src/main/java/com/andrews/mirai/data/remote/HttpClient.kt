@@ -14,70 +14,63 @@ object HttpClient {
 
     private val loggingInterceptor =
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = HttpLoggingInterceptor.Level.BASIC
         }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .addInterceptor(loggingInterceptor)
-        .build()
-
-    /**
-     * Requisição para páginas HTML.
-     * Usada pelo Manga Livre e outras fontes com Jsoup.
-     */
-    fun get(url: String): HttpResponse {
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", USER_AGENT)
-            .header(
-                "Accept",
-                "text/html,application/xhtml+xml," +
-                        "application/xml;q=0.9,*/*;q=0.8"
+    private val client =
+        OkHttpClient.Builder()
+            .connectTimeout(
+                20,
+                TimeUnit.SECONDS
             )
-            .header(
-                "Accept-Language",
-                "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
+            .readTimeout(
+                30,
+                TimeUnit.SECONDS
             )
-            .header("Cache-Control", "no-cache")
-            .header("Pragma", "no-cache")
-            .get()
+            .writeTimeout(
+                30,
+                TimeUnit.SECONDS
+            )
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .addInterceptor(
+                loggingInterceptor
+            )
             .build()
 
-        return execute(request)
-    }
-
-    /**
-     * Requisição para APIs JSON.
-     * Usada pelo Império da Britannia.
-     */
-    fun getJson(url: String): HttpResponse {
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .header(
-                "Accept-Language",
-                "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
-            )
-            .header(
-                "Origin",
-                "https://imperiodabritannia.net"
-            )
-            .header(
-                "Referer",
-                "https://imperiodabritannia.net/"
-            )
-            .header("Cache-Control", "no-cache")
-            .header("Pragma", "no-cache")
-            .header("Accept-Encoding", "identity")
-            .get()
-            .build()
+    fun get(
+        url: String
+    ): HttpResponse {
+        val request =
+            Request.Builder()
+                .url(url)
+                .header(
+                    "User-Agent",
+                    USER_AGENT
+                )
+                .header(
+                    "Accept",
+                    "text/html," +
+                            "application/xhtml+xml," +
+                            "application/json," +
+                            "application/xml;q=0.9," +
+                            "*/*;q=0.8"
+                )
+                .header(
+                    "Accept-Language",
+                    "pt-BR,pt;q=0.9," +
+                            "en-US;q=0.8,en;q=0.7"
+                )
+                .header(
+                    "Cache-Control",
+                    "no-cache"
+                )
+                .header(
+                    "Pragma",
+                    "no-cache"
+                )
+                .get()
+                .build()
 
         return execute(request)
     }
@@ -86,15 +79,18 @@ object HttpClient {
         request: Request
     ): HttpResponse {
         return try {
-            client.newCall(request)
+            client
+                .newCall(request)
                 .execute()
                 .use { response ->
                     HttpResponse(
                         code = response.code,
-                        body = response.body
+                        body = response
+                            .body
                             ?.string()
                             .orEmpty(),
-                        finalUrl = response.request
+                        finalUrl = response
+                            .request
                             .url
                             .toString()
                     )
@@ -103,9 +99,13 @@ object HttpClient {
             HttpResponse(
                 code = 0,
                 body = "",
-                finalUrl = request.url.toString(),
-                errorMessage = throwable.message
-                    ?: throwable.javaClass.simpleName
+                finalUrl =
+                    request.url.toString(),
+                errorMessage =
+                    throwable.message
+                        ?: throwable
+                            .javaClass
+                            .simpleName
             )
         }
     }

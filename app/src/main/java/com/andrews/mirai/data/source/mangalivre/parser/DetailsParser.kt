@@ -1,4 +1,4 @@
-package com.andrews.mirai.data.source.mangalivre
+package com.andrews.mirai.data.source.mangalivre.parser
 
 import com.andrews.mirai.domain.model.Manga
 import org.jsoup.Jsoup
