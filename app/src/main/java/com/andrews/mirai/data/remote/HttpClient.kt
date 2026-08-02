@@ -1,7 +1,10 @@
 package com.andrews.mirai.data.remote
 
+import okhttp3.Headers
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.concurrent.TimeUnit
 
@@ -12,9 +15,14 @@ object HttpClient {
                 "AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/126.0 Mobile Safari/537.36"
 
+    private val jsonMediaType =
+        "application/json; charset=utf-8"
+            .toMediaType()
+
     private val loggingInterceptor =
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
+            level =
+                HttpLoggingInterceptor.Level.BASIC
         }
 
     private val client =
@@ -39,40 +47,123 @@ object HttpClient {
             .build()
 
     fun get(
-        url: String
+        url: String,
+        headers: Map<String, String> =
+            emptyMap()
     ): HttpResponse {
         val request =
             Request.Builder()
                 .url(url)
-                .header(
-                    "User-Agent",
-                    USER_AGENT
-                )
-                .header(
-                    "Accept",
-                    "text/html," +
-                            "application/xhtml+xml," +
-                            "application/json," +
-                            "application/xml;q=0.9," +
-                            "*/*;q=0.8"
-                )
-                .header(
-                    "Accept-Language",
-                    "pt-BR,pt;q=0.9," +
-                            "en-US;q=0.8,en;q=0.7"
-                )
-                .header(
-                    "Cache-Control",
-                    "no-cache"
-                )
-                .header(
-                    "Pragma",
-                    "no-cache"
+                .headers(
+                    createHeaders(headers)
                 )
                 .get()
                 .build()
 
         return execute(request)
+    }
+
+    fun postJson(
+        url: String,
+        jsonBody: String,
+        headers: Map<String, String> =
+            emptyMap()
+    ): HttpResponse {
+        val request =
+            Request.Builder()
+                .url(url)
+                .headers(
+                    createHeaders(headers)
+                )
+                .post(
+                    jsonBody.toRequestBody(
+                        jsonMediaType
+                    )
+                )
+                .build()
+
+        return execute(request)
+    }
+
+    fun patchJson(
+        url: String,
+        jsonBody: String,
+        headers: Map<String, String> =
+            emptyMap()
+    ): HttpResponse {
+        val request =
+            Request.Builder()
+                .url(url)
+                .headers(
+                    createHeaders(headers)
+                )
+                .patch(
+                    jsonBody.toRequestBody(
+                        jsonMediaType
+                    )
+                )
+                .build()
+
+        return execute(request)
+    }
+
+    fun delete(
+        url: String,
+        headers: Map<String, String> =
+            emptyMap()
+    ): HttpResponse {
+        val request =
+            Request.Builder()
+                .url(url)
+                .headers(
+                    createHeaders(headers)
+                )
+                .delete()
+                .build()
+
+        return execute(request)
+    }
+
+    private fun createHeaders(
+        customHeaders: Map<String, String>
+    ): Headers {
+        val builder =
+            Headers.Builder()
+                .add(
+                    "User-Agent",
+                    USER_AGENT
+                )
+                .add(
+                    "Accept",
+                    "application/json, " +
+                            "text/html, " +
+                            "application/xhtml+xml, " +
+                            "*/*;q=0.8"
+                )
+                .add(
+                    "Accept-Language",
+                    "pt-BR,pt;q=0.9," +
+                            "en-US;q=0.8,en;q=0.7"
+                )
+                .add(
+                    "Cache-Control",
+                    "no-cache"
+                )
+                .add(
+                    "Pragma",
+                    "no-cache"
+                )
+
+        customHeaders.forEach {
+                (name, value) ->
+
+            builder.set(
+                name,
+                value
+            )
+        }
+
+        return builder.build()
     }
 
     private fun execute(
@@ -85,14 +176,16 @@ object HttpClient {
                 .use { response ->
                     HttpResponse(
                         code = response.code,
-                        body = response
-                            .body
-                            ?.string()
-                            .orEmpty(),
-                        finalUrl = response
-                            .request
-                            .url
-                            .toString()
+                        body =
+                            response
+                                .body
+                                ?.string()
+                                .orEmpty(),
+                        finalUrl =
+                            response
+                                .request
+                                .url
+                                .toString()
                     )
                 }
         } catch (throwable: Throwable) {

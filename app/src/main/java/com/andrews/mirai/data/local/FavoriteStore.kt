@@ -1,14 +1,19 @@
 package com.andrews.mirai.data.local
 
 import android.content.Context
+import com.andrews.mirai.data.repository.CloudSyncRepository
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.data.source.SourceRegistry
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.domain.model.MangaStatus
 import com.andrews.mirai.domain.model.MangaType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -28,6 +33,12 @@ object FavoriteStore {
     private var initialized = false
 
     private lateinit var applicationContext: Context
+
+    private val syncScope =
+        CoroutineScope(
+            SupervisorJob() +
+                    Dispatchers.IO
+        )
 
     private val _favoriteEntries =
         MutableStateFlow<List<FavoriteEntry>>(
@@ -122,22 +133,34 @@ object FavoriteStore {
         val isNowFavorite: Boolean
 
         if (existingIndex >= 0) {
-            currentEntries.removeAt(
-                existingIndex
-            )
+            val removedEntry =
+                currentEntries.removeAt(
+                    existingIndex
+                )
 
             isNowFavorite = false
+
+            synchronizeFavoriteRemoval(
+                entry = removedEntry
+            )
         } else {
-            currentEntries.add(
-                index = 0,
-                element = FavoriteEntry(
+            val newEntry =
+                FavoriteEntry(
                     sourceId =
                         resolvedSourceId,
                     manga = manga
                 )
+
+            currentEntries.add(
+                index = 0,
+                element = newEntry
             )
 
             isNowFavorite = true
+
+            synchronizeFavoriteAddition(
+                entry = newEntry
+            )
         }
 
         publish(currentEntries)
@@ -151,6 +174,11 @@ object FavoriteStore {
     ) {
         ensureInitialized()
 
+        val removedEntries =
+            _favoriteEntries.value.filter { entry ->
+                entry.manga.id == mangaId
+            }
+
         val updatedEntries =
             _favoriteEntries.value.filterNot { entry ->
                 entry.manga.id == mangaId
@@ -158,6 +186,12 @@ object FavoriteStore {
 
         publish(updatedEntries)
         saveFavoriteEntries(updatedEntries)
+
+        removedEntries.forEach { entry ->
+            synchronizeFavoriteRemoval(
+                entry = entry
+            )
+        }
     }
 
     fun removeFavorite(
@@ -166,21 +200,121 @@ object FavoriteStore {
     ) {
         ensureInitialized()
 
+        val resolvedSourceId =
+            resolveSourceId(
+                savedSourceId = sourceId,
+                mangaId = mangaId
+            )
+
+        val removedEntry =
+            _favoriteEntries.value.firstOrNull { entry ->
+                entry.manga.id == mangaId &&
+                        entry.sourceId ==
+                        resolvedSourceId
+            }
+
         val updatedEntries =
             _favoriteEntries.value.filterNot { entry ->
                 entry.manga.id == mangaId &&
-                        entry.sourceId == sourceId
+                        entry.sourceId ==
+                        resolvedSourceId
             }
 
         publish(updatedEntries)
         saveFavoriteEntries(updatedEntries)
+
+        if (removedEntry != null) {
+            synchronizeFavoriteRemoval(
+                entry = removedEntry
+            )
+        }
     }
 
     fun clearFavorites() {
         ensureInitialized()
 
+        val removedEntries =
+            _favoriteEntries.value
+
         publish(emptyList())
         saveFavoriteEntries(emptyList())
+
+        removedEntries.forEach { entry ->
+            synchronizeFavoriteRemoval(
+                entry = entry
+            )
+        }
+    }
+
+    /*
+     * Usado quando os favoritos forem baixados da nuvem.
+     * Os dados locais mais completos têm prioridade.
+     */
+    fun mergeFavoriteEntries(
+        entries: List<FavoriteEntry>
+    ) {
+        ensureInitialized()
+
+        val currentEntries =
+            _favoriteEntries.value
+
+        val currentKeys =
+            currentEntries
+                .map { entry ->
+                    favoriteKey(
+                        sourceId = entry.sourceId,
+                        mangaId = entry.manga.id
+                    )
+                }
+                .toMutableSet()
+
+        val mergedEntries =
+            currentEntries.toMutableList()
+
+        entries.forEach { entry ->
+            val key =
+                favoriteKey(
+                    sourceId = entry.sourceId,
+                    mangaId = entry.manga.id
+                )
+
+            if (key !in currentKeys) {
+                mergedEntries.add(entry)
+                currentKeys.add(key)
+            }
+        }
+
+        publish(mergedEntries)
+        saveFavoriteEntries(mergedEntries)
+    }
+
+    private fun synchronizeFavoriteAddition(
+        entry: FavoriteEntry
+    ) {
+        if (!CloudSyncRepository.isAvailable()) {
+            return
+        }
+
+        syncScope.launch {
+            CloudSyncRepository.uploadFavorite(
+                entry
+            )
+        }
+    }
+
+    private fun synchronizeFavoriteRemoval(
+        entry: FavoriteEntry
+    ) {
+        if (!CloudSyncRepository.isAvailable()) {
+            return
+        }
+
+        syncScope.launch {
+            CloudSyncRepository.deleteFavorite(
+                sourceId = entry.sourceId,
+                mangaId = entry.manga.id
+            )
+        }
     }
 
     private fun publish(
@@ -218,7 +352,8 @@ object FavoriteStore {
             ) ?: return emptyList()
 
         return runCatching {
-            val jsonArray = JSONArray(json)
+            val jsonArray =
+                JSONArray(json)
 
             buildList {
                 for (
@@ -277,7 +412,8 @@ object FavoriteStore {
                 Context.MODE_PRIVATE
             )
 
-        val jsonArray = JSONArray()
+        val jsonArray =
+            JSONArray()
 
         entries.forEach { entry ->
             jsonArray.put(
@@ -299,7 +435,8 @@ object FavoriteStore {
     private fun favoriteEntryToJsonObject(
         entry: FavoriteEntry
     ): JSONObject {
-        val manga = entry.manga
+        val manga =
+            entry.manga
 
         return JSONObject().apply {
             put(
@@ -307,20 +444,46 @@ object FavoriteStore {
                 entry.sourceId
             )
 
-            put("id", manga.id)
-            put("title", manga.title)
+            put(
+                "id",
+                manga.id
+            )
+
+            put(
+                "title",
+                manga.title
+            )
+
             put(
                 "description",
                 manga.description
             )
-            put("coverUrl", manga.coverUrl)
-            put("author", manga.author)
-            put("status", manga.status.name)
-            put("type", manga.type.name)
+
+            put(
+                "coverUrl",
+                manga.coverUrl
+            )
+
+            put(
+                "author",
+                manga.author
+            )
+
+            put(
+                "status",
+                manga.status.name
+            )
+
+            put(
+                "type",
+                manga.type.name
+            )
 
             put(
                 "genres",
-                JSONArray(manga.genres)
+                JSONArray(
+                    manga.genres
+                )
             )
         }
     }
@@ -333,54 +496,64 @@ object FavoriteStore {
                 "genres"
             )
 
-        val genres = buildList {
-            if (genresArray != null) {
-                for (
-                index in 0 until
-                        genresArray.length()
-                ) {
-                    val genre =
-                        genresArray
-                            .optString(index)
-                            .trim()
+        val genres =
+            buildList {
+                if (genresArray != null) {
+                    for (
+                    index in 0 until
+                            genresArray.length()
+                    ) {
+                        val genre =
+                            genresArray
+                                .optString(index)
+                                .trim()
 
-                    if (genre.isNotBlank()) {
-                        add(genre)
+                        if (genre.isNotBlank()) {
+                            add(genre)
+                        }
                     }
                 }
             }
-        }
 
         return Manga(
-            id = jsonObject
-                .optString("id")
-                .trim(),
-            title = jsonObject
-                .optString("title")
-                .trim(),
-            description = jsonObject
-                .optString("description"),
-            coverUrl = jsonObject
-                .optString("coverUrl")
-                .takeUnless { value ->
-                    value.isBlank() ||
-                            value == "null"
-                },
-            author = jsonObject
-                .optString(
+            id =
+                jsonObject
+                    .optString("id")
+                    .trim(),
+            title =
+                jsonObject
+                    .optString("title")
+                    .trim(),
+            description =
+                jsonObject.optString(
+                    "description"
+                ),
+            coverUrl =
+                jsonObject
+                    .optString(
+                        "coverUrl"
+                    )
+                    .takeUnless { value ->
+                        value.isBlank() ||
+                                value == "null"
+                    },
+            author =
+                jsonObject.optString(
                     "author",
                     "Não informado"
                 ),
-            status = parseStatus(
-                jsonObject.optString(
-                    "status"
-                )
-            ),
-            type = parseType(
-                jsonObject.optString(
-                    "type"
-                )
-            ),
+            status =
+                parseStatus(
+                    jsonObject.optString(
+                        "status"
+                    )
+                ),
+            type =
+                parseType(
+                    jsonObject.optString(
+                        "type"
+                    )
+                ),
             genres = genres
         )
     }
@@ -401,7 +574,9 @@ object FavoriteStore {
             return normalizedSourceId
         }
 
-        return detectSourceId(mangaId)
+        return detectSourceId(
+            mangaId
+        )
     }
 
     private fun detectSourceId(
@@ -452,7 +627,7 @@ object FavoriteStore {
         return runCatching {
             MangaType.valueOf(value)
         }.getOrDefault(
-            MangaType.MANHWA
+            MangaType.UNKNOWN
         )
     }
 

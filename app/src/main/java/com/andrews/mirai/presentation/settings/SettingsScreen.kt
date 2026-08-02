@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +38,7 @@ private const val DISCORD_URL =
 
 private enum class SettingsPage {
     MAIN,
+    ACCOUNT,
     APPEARANCE,
     READER,
     STORAGE,
@@ -43,7 +46,11 @@ private enum class SettingsPage {
 }
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    currentUserEmail: String?,
+    onAuthenticationClick: () -> Unit,
+    onLogoutClick: () -> Unit
+) {
     var currentPage by remember {
         mutableStateOf(SettingsPage.MAIN)
     }
@@ -57,6 +64,14 @@ fun SettingsScreen() {
     when (currentPage) {
         SettingsPage.MAIN -> {
             MainSettingsPage(
+                currentUserEmail = currentUserEmail,
+                onAccountClick = {
+                    if (currentUserEmail == null) {
+                        onAuthenticationClick()
+                    } else {
+                        currentPage = SettingsPage.ACCOUNT
+                    }
+                },
                 onAppearanceClick = {
                     currentPage = SettingsPage.APPEARANCE
                 },
@@ -68,6 +83,19 @@ fun SettingsScreen() {
                 },
                 onAboutClick = {
                     currentPage = SettingsPage.ABOUT
+                }
+            )
+        }
+
+        SettingsPage.ACCOUNT -> {
+            AccountSettingsPage(
+                email = currentUserEmail.orEmpty(),
+                onLogoutClick = {
+                    onLogoutClick()
+                    currentPage = SettingsPage.MAIN
+                },
+                onBackClick = {
+                    currentPage = SettingsPage.MAIN
                 }
             )
         }
@@ -108,12 +136,15 @@ fun SettingsScreen() {
 
 @Composable
 private fun MainSettingsPage(
+    currentUserEmail: String?,
+    onAccountClick: () -> Unit,
     onAppearanceClick: () -> Unit,
     onReaderClick: () -> Unit,
     onStorageClick: () -> Unit,
     onAboutClick: () -> Unit
 ) {
-    val context = LocalContext.current
+    val context =
+        LocalContext.current
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -127,57 +158,95 @@ private fun MainSettingsPage(
             modifier = Modifier.fillMaxSize()
         ) {
             item {
-                SettingsSectionTitle("Aplicativo")
+                SettingsSectionTitle(
+                    title = "Conta"
+                )
 
                 SettingsNavigationItem(
                     icon = {
                         Icon(
-                            imageVector = Icons.Outlined.DarkMode,
+                            imageVector =
+                                Icons.Outlined.AccountCircle,
+                            contentDescription = null
+                        )
+                    },
+                    title =
+                        if (currentUserEmail == null) {
+                            "Entrar ou criar conta"
+                        } else {
+                            "Minha conta"
+                        },
+                    subtitle =
+                        currentUserEmail
+                            ?: "Sincronize favoritos, histórico e progresso",
+                    onClick = onAccountClick
+                )
+            }
+
+            item {
+                SettingsSectionTitle(
+                    title = "Aplicativo"
+                )
+
+                SettingsNavigationItem(
+                    icon = {
+                        Icon(
+                            imageVector =
+                                Icons.Outlined.DarkMode,
                             contentDescription = null
                         )
                     },
                     title = "Aparência",
-                    subtitle = "Tema claro, escuro ou do sistema",
+                    subtitle =
+                        "Tema claro, escuro ou do sistema",
                     onClick = onAppearanceClick
                 )
 
                 SettingsNavigationItem(
                     icon = {
                         Icon(
-                            imageVector = Icons.Outlined.AutoStories,
+                            imageVector =
+                                Icons.Outlined.AutoStories,
                             contentDescription = null
                         )
                     },
                     title = "Leitor",
-                    subtitle = "Tela ligada, tela cheia e páginas",
+                    subtitle =
+                        "Tela ligada, tela cheia e páginas",
                     onClick = onReaderClick
                 )
 
                 SettingsNavigationItem(
                     icon = {
                         Icon(
-                            imageVector = Icons.Outlined.Storage,
+                            imageVector =
+                                Icons.Outlined.Storage,
                             contentDescription = null
                         )
                     },
                     title = "Armazenamento",
-                    subtitle = "Cache e histórico de leitura",
+                    subtitle =
+                        "Cache e histórico de leitura",
                     onClick = onStorageClick
                 )
             }
 
             item {
-                SettingsSectionTitle("Comunidade")
+                SettingsSectionTitle(
+                    title = "Comunidade"
+                )
 
                 SettingsNavigationItem(
                     icon = {
                         Icon(
-                            imageVector = Icons.Outlined.Forum,
+                            imageVector =
+                                Icons.Outlined.Forum,
                             contentDescription = null
                         )
                     },
                     title = "Discord oficial",
-                    subtitle = "Comunidade, suporte, sugestões e bugs",
+                    subtitle =
+                        "Comunidade, suporte, sugestões e bugs",
                     onClick = {
                         openDiscord(context)
                     }
@@ -185,12 +254,15 @@ private fun MainSettingsPage(
             }
 
             item {
-                SettingsSectionTitle("Mirai")
+                SettingsSectionTitle(
+                    title = "Mirai"
+                )
 
                 SettingsNavigationItem(
                     icon = {
                         Icon(
-                            imageVector = Icons.Outlined.Info,
+                            imageVector =
+                                Icons.Outlined.Info,
                             contentDescription = null
                         )
                     },
@@ -209,10 +281,65 @@ private fun MainSettingsPage(
 }
 
 @Composable
+private fun AccountSettingsPage(
+    email: String,
+    onLogoutClick: () -> Unit,
+    onBackClick: () -> Unit
+) {
+    SettingsSubpage(
+        title = "Minha conta",
+        onBackClick = onBackClick
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Text(
+                text = "Conta conectada",
+                style =
+                    MaterialTheme.typography.titleLarge
+            )
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            Text(
+                text = email,
+                style =
+                    MaterialTheme.typography.bodyLarge,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
+            )
+
+            Spacer(
+                modifier = Modifier.height(24.dp)
+            )
+
+            SettingsActionItem(
+                icon = {
+                    Icon(
+                        imageVector =
+                            Icons.Outlined.Logout,
+                        contentDescription = null
+                    )
+                },
+                title = "Sair da conta",
+                subtitle =
+                    "Os dados locais continuarão no dispositivo",
+                onClick = onLogoutClick
+            )
+        }
+    }
+}
+
+@Composable
 private fun AboutSettingsPage(
     onBackClick: () -> Unit
 ) {
-    val context = LocalContext.current
+    val context =
+        LocalContext.current
 
     SettingsSubpage(
         title = "Sobre",
@@ -223,8 +350,10 @@ private fun AboutSettingsPage(
         ) {
             Text(
                 text = "未来",
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.primary
+                style =
+                    MaterialTheme.typography.displayMedium,
+                color =
+                    MaterialTheme.colorScheme.primary
             )
 
             Spacer(
@@ -233,13 +362,18 @@ private fun AboutSettingsPage(
 
             Text(
                 text = "Mirai",
-                style = MaterialTheme.typography.headlineMedium
+                style =
+                    MaterialTheme.typography.headlineMedium
             )
 
             Text(
                 text = "Futuro",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style =
+                    MaterialTheme.typography.bodyLarge,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
             )
 
             Spacer(
@@ -247,8 +381,10 @@ private fun AboutSettingsPage(
             )
 
             Text(
-                text = "Versão ${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.bodyLarge
+                text =
+                    "Versão ${BuildConfig.VERSION_NAME}",
+                style =
+                    MaterialTheme.typography.bodyLarge
             )
 
             Spacer(
@@ -256,9 +392,11 @@ private fun AboutSettingsPage(
             )
 
             Text(
-                text = "Leitor de mangás desenvolvido para oferecer " +
-                        "uma experiência simples, rápida e moderna.",
-                style = MaterialTheme.typography.bodyMedium
+                text =
+                    "Leitor de mangás desenvolvido para oferecer " +
+                            "uma experiência simples, rápida e moderna.",
+                style =
+                    MaterialTheme.typography.bodyMedium
             )
 
             Spacer(
@@ -267,14 +405,20 @@ private fun AboutSettingsPage(
 
             Text(
                 text = "Desenvolvido por",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style =
+                    MaterialTheme.typography.bodyMedium,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
             )
 
             Text(
                 text = "Andreuws",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary
+                style =
+                    MaterialTheme.typography.titleLarge,
+                color =
+                    MaterialTheme.colorScheme.primary
             )
 
             Spacer(
@@ -284,12 +428,14 @@ private fun AboutSettingsPage(
             SettingsActionItem(
                 icon = {
                     Icon(
-                        imageVector = Icons.Outlined.Forum,
+                        imageVector =
+                            Icons.Outlined.Forum,
                         contentDescription = null
                     )
                 },
                 title = "Discord oficial",
-                subtitle = "Comunidade, suporte e sugestões",
+                subtitle =
+                    "Comunidade, suporte e sugestões",
                 onClick = {
                     openDiscord(context)
                 }
@@ -301,10 +447,11 @@ private fun AboutSettingsPage(
 private fun openDiscord(
     context: Context
 ) {
-    val intent = Intent(
-        Intent.ACTION_VIEW,
-        Uri.parse(DISCORD_URL)
-    )
+    val intent =
+        Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse(DISCORD_URL)
+        )
 
     runCatching {
         context.startActivity(intent)
