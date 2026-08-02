@@ -7,20 +7,16 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class MadaraHomeParser(
-
     private val config: MadaraSourceConfig
-
 ) {
 
     fun parse(
         html: String
     ): List<Manga> {
-
-        val document =
-            Jsoup.parse(
-                html,
-                config.baseUrl
-            )
+        val document = Jsoup.parse(
+            html,
+            config.baseUrl
+        )
 
         val mangas =
             linkedMapOf<String, Manga>()
@@ -28,7 +24,6 @@ class MadaraHomeParser(
         document
             .select("a[href]")
             .forEach { link ->
-
                 val manga =
                     parseLink(link)
                         ?: return@forEach
@@ -42,16 +37,15 @@ class MadaraHomeParser(
     private fun parseLink(
         link: Element
     ): Manga? {
-
-        val absoluteUrl =
-            link.absUrl("href")
-                .substringBefore("#")
-                .substringBefore("?")
-                .trimEnd('/')
+        val absoluteUrl = link
+            .absUrl("href")
+            .substringBefore("#")
+            .substringBefore("?")
+            .trimEnd('/')
 
         if (
-            config.mangaPaths.none {
-                absoluteUrl.contains(it)
+            config.mangaPaths.none { path ->
+                absoluteUrl.contains(path)
             }
         ) {
             return null
@@ -65,52 +59,45 @@ class MadaraHomeParser(
         }
 
         return Manga(
-
             id = absoluteUrl,
-
             title = title,
-
             description = "",
-
             coverUrl = findCover(link),
-
-            type = MangaType.MANHWA
+            type = MangaType.UNKNOWN
         )
     }
 
     private fun findTitle(
         link: Element
     ): String {
-
         val direct =
             link.text().trim()
 
         if (
             direct.isNotBlank() &&
             !direct.startsWith(
-                "Capítulo",
-                true
+                prefix = "Capítulo",
+                ignoreCase = true
             ) &&
             !direct.equals(
-                "Ler",
-                true
+                other = "Ler",
+                ignoreCase = true
             )
         ) {
             return direct
         }
 
-        val card =
-            link.closest(
-                """
-                article,
-                .page-item-detail,
-                .c-tabs-item,
-                .row,
-                .item,
-                .manga,
-                .manga-item
-                """.trimIndent()
-            )
+        val card = link.closest(
+            """
+            article,
+            .page-item-detail,
+            .c-tabs-item,
+            .row,
+            .item,
+            .manga,
+            .manga-item
+            """.trimIndent()
+        )
 
         return card
             ?.selectFirst(
@@ -131,36 +118,40 @@ class MadaraHomeParser(
     private fun findCover(
         link: Element
     ): String? {
-
-        val card =
-            link.closest(
-                """
-                article,
-                .page-item-detail,
-                .c-tabs-item,
-                .row,
-                .item,
-                .manga,
-                .manga-item
-                """.trimIndent()
-            )
+        val card = link.closest(
+            """
+            article,
+            .page-item-detail,
+            .c-tabs-item,
+            .row,
+            .item,
+            .manga,
+            .manga-item
+            """.trimIndent()
+        )
 
         val image =
             link.selectFirst("img")
                 ?: card?.selectFirst("img")
                 ?: return null
 
-        return image.absUrl("data-src")
+        return image
+            .absUrl("data-src")
             .ifBlank {
-                image.absUrl("data-lazy-src")
+                image.absUrl(
+                    "data-lazy-src"
+                )
             }
             .ifBlank {
-                image.absUrl("data-original")
+                image.absUrl(
+                    "data-original"
+                )
             }
             .ifBlank {
                 image.absUrl("src")
             }
-            .ifBlank { null }
+            .ifBlank {
+                null
+            }
     }
-
 }

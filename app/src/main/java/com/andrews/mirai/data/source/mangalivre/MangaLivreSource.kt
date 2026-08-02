@@ -13,7 +13,13 @@ class MangaLivreSource : MadaraSource(
     config = MadaraSourceConfig(
         id = MangaLivreConfig.ID,
         name = MangaLivreConfig.NAME,
-        baseUrl = MangaLivreConfig.BASE_URL
+        baseUrl = MangaLivreConfig.BASE_URL,
+        mangaPaths =
+            MangaLivreConfig.MANGA_PATHS,
+        popularPath =
+            MangaLivreConfig.POPULAR_PATH,
+        searchPath =
+            MangaLivreConfig.SEARCH_PATH
     )
 ) {
 
@@ -32,13 +38,15 @@ class MangaLivreSource : MadaraSource(
     override suspend fun getDetails(
         manga: Manga
     ): Manga {
-        val detailsUrl = resolveUrl(manga.id)
+        val detailsUrl =
+            resolveUrl(manga.id)
 
         if (detailsUrl.isBlank()) {
             return manga
         }
 
-        val response = http.get(detailsUrl)
+        val response =
+            http.get(detailsUrl)
 
         if (!response.isSuccessful) {
             return manga
@@ -53,13 +61,15 @@ class MangaLivreSource : MadaraSource(
     override suspend fun getChapters(
         manga: Manga
     ): List<Chapter> {
-        val detailsUrl = resolveUrl(manga.id)
+        val detailsUrl =
+            resolveUrl(manga.id)
 
         if (detailsUrl.isBlank()) {
             return emptyList()
         }
 
-        val response = http.get(detailsUrl)
+        val response =
+            http.get(detailsUrl)
 
         if (!response.isSuccessful) {
             return emptyList()
@@ -84,7 +94,8 @@ class MangaLivreSource : MadaraSource(
             return emptyList()
         }
 
-        val response = http.get(chapterUrl)
+        val response =
+            http.get(chapterUrl)
 
         if (!response.isSuccessful) {
             return emptyList()
@@ -98,7 +109,8 @@ class MangaLivreSource : MadaraSource(
     private fun resolveUrl(
         value: String
     ): String {
-        val normalizedValue = value.trim()
+        val normalizedValue =
+            value.trim()
 
         if (normalizedValue.isBlank()) {
             return ""
@@ -108,15 +120,21 @@ class MangaLivreSource : MadaraSource(
             normalizedValue.startsWith(
                 prefix = "https://",
                 ignoreCase = true
-            ) -> normalizedValue
+            ) -> {
+                normalizedValue
+            }
 
             normalizedValue.startsWith(
                 prefix = "http://",
                 ignoreCase = true
-            ) -> normalizedValue
+            ) -> {
+                normalizedValue
+            }
 
             else -> {
-                "$baseUrl/${normalizedValue.trimStart('/')}"
+                "$baseUrl/${
+                    normalizedValue.trimStart('/')
+                }"
             }
         }
     }

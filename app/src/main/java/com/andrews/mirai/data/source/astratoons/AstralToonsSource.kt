@@ -6,6 +6,7 @@ import com.andrews.mirai.data.source.astratoons.parser.AstralCatalogParser
 import com.andrews.mirai.data.source.astratoons.parser.AstralChapterApiParser
 import com.andrews.mirai.data.source.astratoons.parser.AstralChapterParser
 import com.andrews.mirai.data.source.astratoons.parser.AstralComicIdParser
+import com.andrews.mirai.data.source.astratoons.parser.AstralDetailsParser
 import com.andrews.mirai.data.source.astratoons.parser.AstralPageParser
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
@@ -13,10 +14,15 @@ import com.andrews.mirai.domain.model.ReaderPage
 
 class AstralToonsSource : MangaSource {
 
-    private val http = HttpClient
+    private val http =
+        HttpClient
 
     private val catalogParser by lazy {
         AstralCatalogParser(baseUrl)
+    }
+
+    private val detailsParser by lazy {
+        AstralDetailsParser(baseUrl)
     }
 
     private val chapterParser by lazy {
@@ -64,7 +70,8 @@ class AstralToonsSource : MangaSource {
         query: String,
         page: Int
     ): List<Manga> {
-        val normalizedQuery = query.trim()
+        val normalizedQuery =
+            query.trim()
 
         if (normalizedQuery.isBlank()) {
             return getPopular(page)
@@ -89,29 +96,49 @@ class AstralToonsSource : MangaSource {
     override suspend fun getDetails(
         manga: Manga
     ): Manga {
-        return manga
+        val detailsUrl =
+            AstralToonsUrls.resolve(
+                manga.id
+            )
+
+        if (detailsUrl.isBlank()) {
+            return manga
+        }
+
+        val response =
+            http.get(detailsUrl)
+
+        if (!response.isSuccessful) {
+            return manga
+        }
+
+        return detailsParser.parse(
+            html = response.body,
+            manga = manga
+        )
     }
 
     override suspend fun getChapters(
         manga: Manga
     ): List<Chapter> {
-        val detailsUrl = AstralToonsUrls.resolve(
-            manga.id
-        )
+        val detailsUrl =
+            AstralToonsUrls.resolve(
+                manga.id
+            )
 
         if (detailsUrl.isBlank()) {
             return emptyList()
         }
 
-        val detailsResponse = http.get(
-            detailsUrl
-        )
+        val detailsResponse =
+            http.get(detailsUrl)
 
         if (!detailsResponse.isSuccessful) {
             return emptyList()
         }
 
-        val allChapters = mutableListOf<Chapter>()
+        val allChapters =
+            mutableListOf<Chapter>()
 
         allChapters += chapterParser.parse(
             html = detailsResponse.body,
@@ -146,18 +173,20 @@ class AstralToonsSource : MangaSource {
                 break
             }
 
-            val apiPage = chapterApiParser.parse(
-                apiResponse.body
-            ) ?: break
+            val apiPage =
+                chapterApiParser.parse(
+                    apiResponse.body
+                ) ?: break
 
             if (apiPage.html.isBlank()) {
                 break
             }
 
-            val pageChapters = chapterParser.parse(
-                html = apiPage.html,
-                manga = manga
-            )
+            val pageChapters =
+                chapterParser.parse(
+                    html = apiPage.html,
+                    manga = manga
+                )
 
             if (pageChapters.isEmpty()) {
                 break
@@ -165,7 +194,9 @@ class AstralToonsSource : MangaSource {
 
             allChapters += pageChapters
 
-            hasMore = apiPage.hasMore
+            hasMore =
+                apiPage.hasMore
+
             page++
         }
 
@@ -181,19 +212,19 @@ class AstralToonsSource : MangaSource {
     override suspend fun getPages(
         chapter: Chapter
     ): List<ReaderPage> {
-        val chapterUrl = AstralToonsUrls.resolve(
-            chapter.url.ifBlank {
-                chapter.id
-            }
-        )
+        val chapterUrl =
+            AstralToonsUrls.resolve(
+                chapter.url.ifBlank {
+                    chapter.id
+                }
+            )
 
         if (chapterUrl.isBlank()) {
             return emptyList()
         }
 
-        val response = http.get(
-            chapterUrl
-        )
+        val response =
+            http.get(chapterUrl)
 
         if (!response.isSuccessful) {
             return emptyList()
@@ -205,6 +236,7 @@ class AstralToonsSource : MangaSource {
     }
 
     private companion object {
-        const val MAXIMUM_CHAPTER_PAGES = 100
+        const val MAXIMUM_CHAPTER_PAGES =
+            100
     }
 }

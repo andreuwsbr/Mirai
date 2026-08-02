@@ -49,8 +49,11 @@ internal fun DetailsTopBar(
         ) {
             Icon(
                 imageVector =
-                    Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = "Voltar"
+                    Icons.AutoMirrored
+                        .Outlined
+                        .ArrowBack,
+                contentDescription =
+                    "Voltar"
             )
         }
 
@@ -58,24 +61,29 @@ internal fun DetailsTopBar(
             onClick = onFavoriteClick
         ) {
             Icon(
-                imageVector = if (isFavorite) {
-                    Icons.Filled.Favorite
-                } else {
-                    Icons.Outlined.FavoriteBorder
-                },
+                imageVector =
+                    if (isFavorite) {
+                        Icons.Filled.Favorite
+                    } else {
+                        Icons.Outlined
+                            .FavoriteBorder
+                    },
                 contentDescription =
                     if (isFavorite) {
                         "Remover dos favoritos"
                     } else {
                         "Adicionar aos favoritos"
                     },
-                tint = if (isFavorite) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme
-                        .colorScheme
-                        .onSurfaceVariant
-                }
+                tint =
+                    if (isFavorite) {
+                        MaterialTheme
+                            .colorScheme
+                            .primary
+                    } else {
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
+                    }
             )
         }
     }
@@ -97,30 +105,41 @@ internal fun MangaDetailsContent(
             CircularProgressIndicator()
 
             Spacer(
-                modifier = Modifier.height(20.dp)
+                modifier =
+                    Modifier.height(20.dp)
             )
         }
 
         if (detailsError != null) {
             Text(
                 text =
-                    "Não foi possível carregar todos os detalhes.\n$detailsError",
-                color = MaterialTheme.colorScheme.error
+                    "Não foi possível carregar " +
+                            "todos os detalhes.\n" +
+                            detailsError,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .error
             )
 
             Spacer(
-                modifier = Modifier.height(20.dp)
+                modifier =
+                    Modifier.height(20.dp)
             )
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.Start
         ) {
             AsyncImage(
                 model = manga.coverUrl,
-                contentDescription = "Capa de ${manga.title}",
-                contentScale = ContentScale.Crop,
+                contentDescription =
+                    "Capa de ${manga.title}",
+                contentScale =
+                    ContentScale.Crop,
                 modifier = Modifier
                     .width(140.dp)
                     .height(200.dp)
@@ -130,11 +149,13 @@ internal fun MangaDetailsContent(
             )
 
             Spacer(
-                modifier = Modifier.width(16.dp)
+                modifier =
+                    Modifier.width(16.dp)
             )
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier =
+                    Modifier.weight(1f)
             ) {
                 Text(
                     text = manga.title,
@@ -145,11 +166,15 @@ internal fun MangaDetailsContent(
                 )
 
                 Spacer(
-                    modifier = Modifier.height(12.dp)
+                    modifier =
+                        Modifier.height(12.dp)
                 )
 
                 Text(
-                    text = "Tipo: ${manga.type.name}",
+                    text =
+                        "Tipo: " +
+                                manga.type
+                                    .displayName,
                     style =
                         MaterialTheme
                             .typography
@@ -161,11 +186,13 @@ internal fun MangaDetailsContent(
                 )
 
                 Spacer(
-                    modifier = Modifier.height(8.dp)
+                    modifier =
+                        Modifier.height(8.dp)
                 )
 
                 Text(
-                    text = "Autor: ${manga.author}",
+                    text =
+                        "Autor: ${manga.author}",
                     style =
                         MaterialTheme
                             .typography
@@ -173,11 +200,15 @@ internal fun MangaDetailsContent(
                 )
 
                 Spacer(
-                    modifier = Modifier.height(8.dp)
+                    modifier =
+                        Modifier.height(8.dp)
                 )
 
                 Text(
-                    text = "Status: ${manga.status.name}",
+                    text =
+                        "Status: " +
+                                manga.status
+                                    .displayName,
                     style =
                         MaterialTheme
                             .typography
@@ -187,53 +218,75 @@ internal fun MangaDetailsContent(
         }
 
         Spacer(
-            modifier = Modifier.height(24.dp)
+            modifier =
+                Modifier.height(24.dp)
         )
 
         Text(
             text = "Sinopse",
-            style = MaterialTheme.typography.titleLarge
+            style =
+                MaterialTheme
+                    .typography
+                    .titleLarge
         )
 
         Spacer(
-            modifier = Modifier.height(8.dp)
+            modifier =
+                Modifier.height(8.dp)
         )
 
         Text(
-            text = manga.description.ifBlank {
-                "A sinopse não foi encontrada."
-            },
-            style = MaterialTheme.typography.bodyMedium
+            text =
+                manga.description.ifBlank {
+                    "A sinopse não foi encontrada."
+                },
+            style =
+                MaterialTheme
+                    .typography
+                    .bodyMedium
         )
 
         if (manga.genres.isNotEmpty()) {
             Spacer(
-                modifier = Modifier.height(24.dp)
+                modifier =
+                    Modifier.height(24.dp)
             )
 
             Text(
                 text = "Gêneros",
-                style = MaterialTheme.typography.titleLarge
+                style =
+                    MaterialTheme
+                        .typography
+                        .titleLarge
             )
 
             Spacer(
-                modifier = Modifier.height(8.dp)
+                modifier =
+                    Modifier.height(8.dp)
             )
 
             Text(
-                text = manga.genres.joinToString(", "),
-                style = MaterialTheme.typography.bodyMedium
+                text =
+                    manga.genres.joinToString(
+                        separator = ", "
+                    ),
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodyMedium
             )
         }
 
         Spacer(
-            modifier = Modifier.height(28.dp)
+            modifier =
+                Modifier.height(28.dp)
         )
 
         HorizontalDivider()
 
         Spacer(
-            modifier = Modifier.height(20.dp)
+            modifier =
+                Modifier.height(20.dp)
         )
     }
 }

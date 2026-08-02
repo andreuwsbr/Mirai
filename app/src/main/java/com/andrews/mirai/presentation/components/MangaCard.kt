@@ -101,7 +101,7 @@ fun MangaCard(
         )
 
         Text(
-            text = manga.type.name,
+            text = manga.type.displayName,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(

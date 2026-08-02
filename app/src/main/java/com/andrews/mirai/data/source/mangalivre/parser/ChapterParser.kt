@@ -1,5 +1,6 @@
 package com.andrews.mirai.data.source.mangalivre.parser
 
+import com.andrews.mirai.data.source.mangalivre.MangaLivreSelectors
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import org.jsoup.Jsoup
@@ -13,21 +14,29 @@ class ChapterParser(
         html: String,
         manga: Manga
     ): List<Chapter> {
-        val document = Jsoup.parse(html, baseUrl)
-        val chaptersByUrl = linkedMapOf<String, Chapter>()
+        val document =
+            Jsoup.parse(html, baseUrl)
+
+        val chaptersByUrl =
+            linkedMapOf<String, Chapter>()
 
         document
-            .select("a.chapter-link")
+            .select(
+                MangaLivreSelectors.CHAPTER_LINK
+            )
             .forEach { link ->
                 val chapter = parseChapter(
                     link = link,
                     manga = manga
                 ) ?: return@forEach
 
-                chaptersByUrl[chapter.id] = chapter
+                chaptersByUrl[chapter.id] =
+                    chapter
             }
 
-        return chaptersByUrl.values.toList()
+        return chaptersByUrl
+            .values
+            .toList()
     }
 
     private fun parseChapter(
@@ -45,7 +54,10 @@ class ChapterParser(
         }
 
         val name = link
-            .selectFirst(".chapter-number")
+            .selectFirst(
+                MangaLivreSelectors
+                    .CHAPTER_NUMBER
+            )
             ?.text()
             ?.trim()
             .orEmpty()
@@ -57,12 +69,18 @@ class ChapterParser(
             return null
         }
 
-        val number = extractChapterNumber(name)
+        val number =
+            extractChapterNumber(name)
 
-        val chapterItem = link.closest(".chapter-item")
+        val chapterItem = link.closest(
+            MangaLivreSelectors.CHAPTER_ITEM
+        )
 
         val uploadedAt = chapterItem
-            ?.selectFirst(".chapter-date")
+            ?.selectFirst(
+                MangaLivreSelectors
+                    .CHAPTER_DATE
+            )
             ?.text()
             ?.trim()
             .orEmpty()
@@ -77,14 +95,20 @@ class ChapterParser(
         )
     }
 
-    private fun extractChapterNumber(name: String): Double {
+    private fun extractChapterNumber(
+        name: String
+    ): Double {
         val numberText = Regex(
-            pattern = """(\d+(?:[.,]\d+)?)"""
-        ).find(name)
+            pattern =
+                """(\d+(?:[.,]\d+)?)"""
+        )
+            .find(name)
             ?.groupValues
             ?.getOrNull(1)
             ?.replace(',', '.')
 
-        return numberText?.toDoubleOrNull() ?: 0.0
+        return numberText
+            ?.toDoubleOrNull()
+            ?: 0.0
     }
 }

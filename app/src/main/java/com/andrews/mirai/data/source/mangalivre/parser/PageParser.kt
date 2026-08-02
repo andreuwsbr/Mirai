@@ -1,5 +1,6 @@
 package com.andrews.mirai.data.source.mangalivre.parser
 
+import com.andrews.mirai.data.source.mangalivre.MangaLivreSelectors
 import com.andrews.mirai.domain.model.ReaderPage
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -9,42 +10,68 @@ class PageParser(
     private val baseUrl: String
 ) {
 
-    fun parse(html: String): List<ReaderPage> {
-        val document = Jsoup.parse(html, baseUrl)
-        val pagesByUrl = linkedMapOf<String, ReaderPage>()
+    fun parse(
+        html: String
+    ): List<ReaderPage> {
+        val document =
+            Jsoup.parse(html, baseUrl)
+
+        val pagesByUrl =
+            linkedMapOf<String, ReaderPage>()
 
         document
-            .select(".chapter-image-container")
-            .forEachIndexed { position, container ->
+            .select(
+                MangaLivreSelectors
+                    .PAGE_CONTAINER
+            )
+            .forEachIndexed {
+                    position,
+                    container ->
+
                 val page = parsePage(
                     container = container,
                     fallbackIndex = position
                 ) ?: return@forEachIndexed
 
-                pagesByUrl[page.imageUrl] = page
+                pagesByUrl[page.imageUrl] =
+                    page
             }
 
-        return pagesByUrl.values
-            .sortedBy { page -> page.index }
+        return pagesByUrl
+            .values
+            .sortedBy { page ->
+                page.index
+            }
     }
 
     private fun parsePage(
         container: Element,
         fallbackIndex: Int
     ): ReaderPage? {
-        val image = container.selectFirst("img.chapter-image")
-            ?: container.selectFirst("img")
-            ?: return null
+        val image = container.selectFirst(
+            MangaLivreSelectors
+                .PAGE_PRIMARY_IMAGE
+        ) ?: container.selectFirst(
+            MangaLivreSelectors
+                .PAGE_FALLBACK_IMAGE
+        ) ?: return null
 
-        val imageUrl = extractBestImageUrl(image)
-            ?: return null
+        val imageUrl =
+            extractBestImageUrl(image)
+                ?: return null
 
         val pageNumber = container
-            .attr("data-page")
+            .attr(
+                MangaLivreSelectors
+                    .PAGE_NUMBER_ATTRIBUTE
+            )
             .toIntOrNull()
             ?: container
                 .id()
-                .removePrefix("page-")
+                .removePrefix(
+                    MangaLivreSelectors
+                        .PAGE_ID_PREFIX
+                )
                 .toIntOrNull()
             ?: fallbackIndex + 1
 
@@ -54,63 +81,59 @@ class PageParser(
         )
     }
 
-    private fun extractBestImageUrl(image: Element): String? {
-        val directAttributes = listOf(
-            "data-full",
-            "data-full-url",
-            "data-original",
-            "data-original-src",
-            "data-high-res-src",
-            "data-hires",
-            "data-src"
-        )
+    private fun extractBestImageUrl(
+        image: Element
+    ): String? {
+        MangaLivreSelectors
+            .PAGE_DIRECT_IMAGE_ATTRIBUTES
+            .forEach { attribute ->
+                val rawUrl =
+                    image
+                        .attr(attribute)
+                        .trim()
 
-        directAttributes.forEach { attribute ->
-            val rawUrl = image.attr(attribute).trim()
-
-            if (rawUrl.isNotBlank()) {
-                return resolveUrl(
-                    image = image,
-                    rawUrl = rawUrl
-                )
+                if (rawUrl.isNotBlank()) {
+                    return resolveUrl(
+                        image = image,
+                        rawUrl = rawUrl
+                    )
+                }
             }
-        }
 
-        val srcSetAttributes = listOf(
-            "data-srcset",
-            "data-lazy-srcset",
-            "srcset"
-        )
+        MangaLivreSelectors
+            .PAGE_SRCSET_ATTRIBUTES
+            .forEach { attribute ->
+                val srcSet = image
+                    .attr(attribute)
+                    .trim()
 
-        srcSetAttributes.forEach { attribute ->
-            val srcSet = image.attr(attribute).trim()
+                val largestUrl =
+                    extractLargestUrlFromSrcSet(
+                        srcSet
+                    )
 
-            val largestUrl = extractLargestUrlFromSrcSet(srcSet)
-
-            if (!largestUrl.isNullOrBlank()) {
-                return resolveUrl(
-                    image = image,
-                    rawUrl = largestUrl
-                )
+                if (!largestUrl.isNullOrBlank()) {
+                    return resolveUrl(
+                        image = image,
+                        rawUrl = largestUrl
+                    )
+                }
             }
-        }
 
-        val lazyAttributes = listOf(
-            "data-lazy-src",
-            "data-url",
-            "src"
-        )
+        MangaLivreSelectors
+            .PAGE_LAZY_IMAGE_ATTRIBUTES
+            .forEach { attribute ->
+                val rawUrl = image
+                    .attr(attribute)
+                    .trim()
 
-        lazyAttributes.forEach { attribute ->
-            val rawUrl = image.attr(attribute).trim()
-
-            if (rawUrl.isNotBlank()) {
-                return resolveUrl(
-                    image = image,
-                    rawUrl = rawUrl
-                )
+                if (rawUrl.isNotBlank()) {
+                    return resolveUrl(
+                        image = image,
+                        rawUrl = rawUrl
+                    )
+                }
             }
-        }
 
         return null
     }
@@ -127,11 +150,16 @@ class PageParser(
             .mapNotNull { candidate ->
                 val parts = candidate
                     .trim()
-                    .split(Regex("\\s+"))
+                    .split(
+                        Regex("\\s+")
+                    )
 
-                val url = parts.firstOrNull()
+                val url = parts
+                    .firstOrNull()
                     ?.trim()
-                    ?.takeIf { it.isNotBlank() }
+                    ?.takeIf { value ->
+                        value.isNotBlank()
+                    }
                     ?: return@mapNotNull null
 
                 val size = parts
@@ -162,13 +190,18 @@ class PageParser(
             .removeSuffix("\"")
 
         return runCatching {
-            val pageBaseUrl = image.baseUri()
-                .ifBlank { baseUrl }
+            val pageBaseUrl = image
+                .baseUri()
+                .ifBlank {
+                    baseUrl
+                }
 
             URI(pageBaseUrl)
                 .resolve(cleanUrl)
                 .toString()
-        }.getOrDefault(cleanUrl)
+        }.getOrDefault(
+            cleanUrl
+        )
     }
 
     private data class ImageCandidate(
