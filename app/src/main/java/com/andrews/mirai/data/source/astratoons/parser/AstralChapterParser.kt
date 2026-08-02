@@ -1,5 +1,6 @@
 package com.andrews.mirai.data.source.astratoons.parser
 
+import com.andrews.mirai.data.source.astratoons.AstralToonsSelectors
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import org.jsoup.Jsoup
@@ -19,7 +20,10 @@ class AstralChapterParser(
         )
 
         return document
-            .select("a[href*='/capitulo/']")
+            .select(
+                AstralToonsSelectors
+                    .CHAPTER_LINK
+            )
             .mapNotNull { element ->
                 parseChapter(
                     element = element,
@@ -51,26 +55,35 @@ class AstralChapterParser(
         }
 
         val data = element
-            .attr("x-data")
+            .attr(
+                AstralToonsSelectors
+                    .CHAPTER_LOCK_ATTRIBUTE
+            )
             .lowercase()
 
-        if (data.contains("islocked: true")) {
+        if (
+            data.contains(
+                AstralToonsSelectors
+                    .CHAPTER_LOCKED_VALUE
+            )
+        ) {
             return null
         }
 
-        val visibleText = element
-            .text()
-            .trim()
+        val visibleText =
+            element.text().trim()
 
-        val chapterNumber = extractChapterNumber(
-            href = href,
-            text = visibleText
-        ) ?: return null
+        val chapterNumber =
+            extractChapterNumber(
+                href = href,
+                text = visibleText
+            ) ?: return null
 
-        val chapterName = extractChapterName(
-            text = visibleText,
-            number = chapterNumber
-        )
+        val chapterName =
+            extractChapterName(
+                text = visibleText,
+                number = chapterNumber
+            )
 
         return Chapter(
             id = href,
@@ -78,9 +91,10 @@ class AstralChapterParser(
             name = chapterName,
             number = chapterNumber,
             url = href,
-            uploadedAt = extractUploadedAt(
-                visibleText
-            )
+            uploadedAt =
+                extractUploadedAt(
+                    visibleText
+                )
         )
     }
 
@@ -88,23 +102,20 @@ class AstralChapterParser(
         href: String,
         text: String
     ): Double? {
-        val numberFromUrl = Regex(
-            pattern = """/capitulo/(\d+(?:\.\d+)?)""",
-            option = RegexOption.IGNORE_CASE
-        )
-            .find(href)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.toDoubleOrNull()
+        val numberFromUrl =
+            AstralToonsSelectors
+                .CHAPTER_NUMBER_FROM_URL
+                .find(href)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toDoubleOrNull()
 
         if (numberFromUrl != null) {
             return numberFromUrl
         }
 
-        return Regex(
-            pattern = """cap[ií]tulo\s+(\d+(?:\.\d+)?)""",
-            option = RegexOption.IGNORE_CASE
-        )
+        return AstralToonsSelectors
+            .CHAPTER_NUMBER_FROM_TEXT
             .find(text)
             ?.groupValues
             ?.getOrNull(1)
@@ -115,38 +126,35 @@ class AstralChapterParser(
         text: String,
         number: Double
     ): String {
-        val match = Regex(
-            pattern = """cap[ií]tulo\s+\d+(?:\.\d+)?""",
-            option = RegexOption.IGNORE_CASE
-        ).find(text)
+        val match =
+            AstralToonsSelectors
+                .CHAPTER_NAME
+                .find(text)
 
         return match
             ?.value
-            ?.replaceFirstChar { character ->
+            ?.replaceFirstChar {
+                    character ->
                 character.uppercase()
             }
-            ?: "Capítulo ${formatNumber(number)}"
+            ?: "Capítulo ${
+                formatNumber(number)
+            }"
     }
 
     private fun extractUploadedAt(
         text: String
     ): String {
-        val patterns = listOf(
-            """há\s+\d+\s+(?:minuto|minutos|hora|horas|dia|dias|semana|semanas|mês|meses|ano|anos)""",
-            """ontem""",
-            """hoje"""
-        )
+        AstralToonsSelectors
+            .CHAPTER_DATE_PATTERNS
+            .forEach { pattern ->
+                val result =
+                    pattern.find(text)
 
-        patterns.forEach { pattern ->
-            val result = Regex(
-                pattern = pattern,
-                option = RegexOption.IGNORE_CASE
-            ).find(text)
-
-            if (result != null) {
-                return result.value
+                if (result != null) {
+                    return result.value
+                }
             }
-        }
 
         return ""
     }
@@ -154,7 +162,8 @@ class AstralChapterParser(
     private fun resolveUrl(
         value: String
     ): String {
-        val normalizedValue = value.trim()
+        val normalizedValue =
+            value.trim()
 
         if (normalizedValue.isBlank()) {
             return ""
@@ -162,17 +171,23 @@ class AstralChapterParser(
 
         return when {
             normalizedValue.startsWith(
-                "https://",
+                prefix = "https://",
                 ignoreCase = true
-            ) -> normalizedValue
+            ) -> {
+                normalizedValue
+            }
 
             normalizedValue.startsWith(
-                "http://",
+                prefix = "http://",
                 ignoreCase = true
-            ) -> normalizedValue
+            ) -> {
+                normalizedValue
+            }
 
             else -> {
-                "$baseUrl/${normalizedValue.trimStart('/')}"
+                "$baseUrl/${
+                    normalizedValue.trimStart('/')
+                }"
             }
         }
     }
@@ -180,7 +195,9 @@ class AstralChapterParser(
     private fun formatNumber(
         value: Double
     ): String {
-        return if (value % 1.0 == 0.0) {
+        return if (
+            value % 1.0 == 0.0
+        ) {
             value.toInt().toString()
         } else {
             value.toString()

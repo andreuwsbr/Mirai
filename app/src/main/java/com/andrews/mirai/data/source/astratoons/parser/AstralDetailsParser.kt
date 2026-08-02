@@ -1,5 +1,6 @@
 package com.andrews.mirai.data.source.astratoons.parser
 
+import com.andrews.mirai.data.source.astratoons.AstralToonsSelectors
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.domain.model.MangaStatus
 import com.andrews.mirai.domain.model.MangaType
@@ -18,7 +19,10 @@ class AstralDetailsParser(
             Jsoup.parse(html, baseUrl)
 
         val visibleTexts = document
-            .select("span")
+            .select(
+                AstralToonsSelectors
+                    .DETAILS_METADATA
+            )
             .map { element ->
                 element.text().trim()
             }
@@ -78,7 +82,10 @@ class AstralDetailsParser(
         document: Document
     ): String {
         return document
-            .selectFirst("h1")
+            .selectFirst(
+                AstralToonsSelectors
+                    .DETAILS_TITLE
+            )
             ?.text()
             ?.trim()
             .orEmpty()
@@ -202,8 +209,10 @@ class AstralDetailsParser(
 
         return normalizedValue.isNotBlank() &&
                 normalizedValue != "n/a" &&
-                normalizedValue != "não informado" &&
-                normalizedValue != "nao informado" &&
+                normalizedValue !=
+                "não informado" &&
+                normalizedValue !=
+                "nao informado" &&
                 normalizedValue != "-"
     }
 }

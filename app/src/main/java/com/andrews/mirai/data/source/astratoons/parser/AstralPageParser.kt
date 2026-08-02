@@ -1,5 +1,6 @@
 package com.andrews.mirai.data.source.astratoons.parser
 
+import com.andrews.mirai.data.source.astratoons.AstralToonsSelectors
 import com.andrews.mirai.domain.model.ReaderPage
 import org.jsoup.Jsoup
 import java.net.URI
@@ -16,30 +17,36 @@ class AstralPageParser(
             baseUrl
         )
 
-        val imageUrls = linkedSetOf<String>()
+        val imageUrls =
+            linkedSetOf<String>()
 
         document
             .select(
-                "img[src*='/storage/chapters/'], " +
-                        "img[data-src*='/storage/chapters/'], " +
-                        "img[data-lazy-src*='/storage/chapters/']"
+                AstralToonsSelectors
+                    .PAGE_IMAGE
             )
             .forEach { image ->
-                val rawUrl = sequenceOf(
-                    image.attr("src"),
-                    image.attr("data-src"),
-                    image.attr("data-lazy-src")
-                )
-                    .map(String::trim)
-                    .firstOrNull { value ->
-                        value.contains(
-                            "/storage/chapters/",
-                            ignoreCase = true
-                        )
-                    }
+                val rawUrl =
+                    AstralToonsSelectors
+                        .PAGE_IMAGE_ATTRIBUTES
+                        .asSequence()
+                        .map { attribute ->
+                            image
+                                .attr(attribute)
+                                .trim()
+                        }
+                        .firstOrNull { value ->
+                            value.contains(
+                                other =
+                                    AstralToonsSelectors
+                                        .PAGE_STORAGE_PATH,
+                                ignoreCase = true
+                            )
+                        }
 
                 if (!rawUrl.isNullOrBlank()) {
-                    resolveUrl(rawUrl)?.let(imageUrls::add)
+                    resolveUrl(rawUrl)
+                        ?.let(imageUrls::add)
                 }
             }
 
@@ -52,7 +59,10 @@ class AstralPageParser(
                     ::extractPageNumber
                 )
             )
-            .mapIndexed { index, imageUrl ->
+            .mapIndexed {
+                    index,
+                    imageUrl ->
+
                 ReaderPage(
                     index = index,
                     imageUrl = imageUrl
@@ -63,18 +73,16 @@ class AstralPageParser(
     private fun extractUrlsFromHtml(
         html: String
     ): List<String> {
-        val regex = Regex(
-            pattern =
-                """https?://[^"'\\\s<>]+/storage/chapters/[^"'\\\s<>]+?\.(?:jpg|jpeg|png|webp|avif)(?:\?[^"'\\\s<>]*)?""",
-            option = RegexOption.IGNORE_CASE
-        )
-
-        return regex
+        return AstralToonsSelectors
+            .PAGE_URL
             .findAll(html)
             .map { match ->
                 match.value
                     .replace("\\/", "/")
-                    .replace("\\u0026", "&")
+                    .replace(
+                        "\\u0026",
+                        "&"
+                    )
             }
             .distinct()
             .toList()
@@ -86,11 +94,17 @@ class AstralPageParser(
         val normalizedValue = value
             .trim()
             .replace("\\/", "/")
-            .replace("\\u0026", "&")
+            .replace(
+                "\\u0026",
+                "&"
+            )
 
         if (
             normalizedValue.isBlank() ||
-            normalizedValue.startsWith("data:")
+            normalizedValue.startsWith(
+                prefix = "data:",
+                ignoreCase = true
+            )
         ) {
             return null
         }
@@ -109,7 +123,8 @@ class AstralPageParser(
             .substringBefore("?")
             .substringAfterLast("/")
 
-        return Regex("""\d+""")
+        return AstralToonsSelectors
+            .PAGE_NUMBER
             .find(fileName)
             ?.value
             ?.toIntOrNull()

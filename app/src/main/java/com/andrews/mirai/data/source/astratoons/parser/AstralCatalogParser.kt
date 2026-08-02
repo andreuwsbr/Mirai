@@ -1,5 +1,6 @@
 package com.andrews.mirai.data.source.astratoons.parser
 
+import com.andrews.mirai.data.source.astratoons.AstralToonsSelectors
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.domain.model.MangaStatus
 import com.andrews.mirai.domain.model.MangaType
@@ -19,7 +20,10 @@ class AstralCatalogParser(
         )
 
         return document
-            .select("a[href*='/comics/']")
+            .select(
+                AstralToonsSelectors
+                    .CATALOG_CARD
+            )
             .mapNotNull(::parseCard)
             .distinctBy { manga ->
                 manga.id
@@ -36,7 +40,7 @@ class AstralCatalogParser(
         if (
             relativeUrl.isBlank() ||
             relativeUrl.contains(
-                "/capitulo/",
+                other = "/capitulo/",
                 ignoreCase = true
             )
         ) {
@@ -44,7 +48,10 @@ class AstralCatalogParser(
         }
 
         val title = card
-            .selectFirst("h2")
+            .selectFirst(
+                AstralToonsSelectors
+                    .CATALOG_TITLE
+            )
             ?.text()
             ?.trim()
             .orEmpty()
@@ -56,15 +63,23 @@ class AstralCatalogParser(
         val fullUrl = card
             .absUrl("href")
             .ifBlank {
-                "$baseUrl/${relativeUrl.trimStart('/')}"
+                "$baseUrl/${
+                    relativeUrl.trimStart('/')
+                }"
             }
 
         val coverUrl = card
-            .selectFirst("img")
+            .selectFirst(
+                AstralToonsSelectors
+                    .CATALOG_COVER
+            )
             ?.let { image ->
-                image.absUrl("src")
+                image
+                    .absUrl("src")
                     .ifBlank {
-                        image.attr("src").trim()
+                        image
+                            .attr("src")
+                            .trim()
                     }
             }
             ?.takeIf { url ->
@@ -72,13 +87,19 @@ class AstralCatalogParser(
             }
 
         val description = card
-            .selectFirst("p")
+            .selectFirst(
+                AstralToonsSelectors
+                    .CATALOG_DESCRIPTION
+            )
             ?.text()
             ?.trim()
             .orEmpty()
 
         val visibleTexts = card
-            .select("span")
+            .select(
+                AstralToonsSelectors
+                    .CATALOG_METADATA
+            )
             .map { span ->
                 span.text().trim()
             }
@@ -91,9 +112,11 @@ class AstralCatalogParser(
             title = title,
             description = description,
             coverUrl = coverUrl,
-            status = parseStatus(visibleTexts),
+            status =
+                parseStatus(visibleTexts),
             type = MangaType.MANHWA,
-            genres = parseGenres(visibleTexts)
+            genres =
+                parseGenres(visibleTexts)
         )
     }
 
@@ -103,30 +126,47 @@ class AstralCatalogParser(
         return when {
             texts.any { text ->
                 text.contains(
-                    "completo",
+                    other = "cancelado",
                     ignoreCase = true
                 )
-            } -> MangaStatus.COMPLETED
+            } -> {
+                MangaStatus.CANCELLED
+            }
 
             texts.any { text ->
                 text.contains(
-                    "hiato",
+                    other = "completo",
                     ignoreCase = true
                 )
-            } -> MangaStatus.HIATUS
+            } -> {
+                MangaStatus.COMPLETED
+            }
 
             texts.any { text ->
                 text.contains(
-                    "andamento",
+                    other = "hiato",
+                    ignoreCase = true
+                )
+            } -> {
+                MangaStatus.HIATUS
+            }
+
+            texts.any { text ->
+                text.contains(
+                    other = "andamento",
                     ignoreCase = true
                 ) ||
                         text.contains(
-                            "em dia",
+                            other = "em dia",
                             ignoreCase = true
                         )
-            } -> MangaStatus.ONGOING
+            } -> {
+                MangaStatus.ONGOING
+            }
 
-            else -> MangaStatus.UNKNOWN
+            else -> {
+                MangaStatus.UNKNOWN
+            }
         }
     }
 
@@ -135,6 +175,7 @@ class AstralCatalogParser(
     ): List<String> {
         val ignoredTexts = listOf(
             "completo",
+            "cancelado",
             "hiato",
             "em andamento",
             "em dia"
@@ -144,7 +185,7 @@ class AstralCatalogParser(
             .filterNot { text ->
                 ignoredTexts.any { ignored ->
                     text.equals(
-                        ignored,
+                        other = ignored,
                         ignoreCase = true
                     )
                 }
