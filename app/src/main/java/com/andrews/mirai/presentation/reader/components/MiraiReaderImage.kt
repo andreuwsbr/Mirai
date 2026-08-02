@@ -3,6 +3,7 @@ package com.andrews.mirai.presentation.reader.components
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
@@ -28,7 +29,8 @@ fun MiraiReaderImage(
         AsyncImage(
             model = imageFileUri,
             contentDescription = "Página do capítulo",
-            contentScale = ContentScale.Fit,
+            contentScale = ContentScale.FillWidth,
+            filterQuality = FilterQuality.High,
             modifier = modifier
         )
     }

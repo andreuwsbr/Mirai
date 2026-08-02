@@ -2,42 +2,55 @@ package com.andrews.mirai.presentation.reader
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
 import com.andrews.mirai.presentation.reader.mode.HorizontalPagedReader
+import com.andrews.mirai.presentation.reader.mode.LongStripChapterSection
 import com.andrews.mirai.presentation.reader.mode.LongStripReader
 import com.andrews.mirai.presentation.reader.mode.VerticalPagedReader
 import com.andrews.mirai.presentation.reader.settings.ReaderMode
 
 @Composable
 internal fun ReaderModeContent(
+    activeChapter: Chapter,
     pages: List<ReaderPage>,
+    longStripSections: List<LongStripChapterSection>,
     mode: ReaderMode,
     longStripGapDp: Int,
     initialPage: Int,
+    requestedChapterId: String?,
     requestedPage: Int?,
+    showFinalCompletion: Boolean,
     imageDownloader: ReaderImageDownloader,
     backgroundColor: Color,
-    onPageChanged: (Int) -> Unit,
+    onPositionChanged: (
+        chapter: Chapter,
+        pageIndex: Int
+    ) -> Unit,
     onRequestedPageConsumed: () -> Unit,
-    onEndReached: () -> Unit,
     onTap: () -> Unit
 ) {
     when (mode) {
         ReaderMode.LONG_STRIP,
         ReaderMode.LONG_STRIP_GAPS -> {
             LongStripReader(
-                pages = pages,
+                sections = longStripSections,
                 mode = mode,
                 gapDp = longStripGapDp,
+                initialChapterId = activeChapter.id,
                 initialPage = initialPage,
+                requestedChapterId =
+                    requestedChapterId,
                 requestedPage = requestedPage,
+                showFinalCompletion =
+                    showFinalCompletion,
                 imageDownloader = imageDownloader,
                 backgroundColor = backgroundColor,
-                onPageChanged = onPageChanged,
+                onPositionChanged =
+                    onPositionChanged,
                 onRequestedPageConsumed =
                     onRequestedPageConsumed,
-                onEndReached = onEndReached,
                 onTap = onTap
             )
         }
@@ -51,7 +64,12 @@ internal fun ReaderModeContent(
                 requestedPage = requestedPage,
                 imageDownloader = imageDownloader,
                 backgroundColor = backgroundColor,
-                onPageChanged = onPageChanged,
+                onPageChanged = { pageIndex ->
+                    onPositionChanged(
+                        activeChapter,
+                        pageIndex
+                    )
+                },
                 onRequestedPageConsumed =
                     onRequestedPageConsumed,
                 onTap = onTap
@@ -65,7 +83,12 @@ internal fun ReaderModeContent(
                 requestedPage = requestedPage,
                 imageDownloader = imageDownloader,
                 backgroundColor = backgroundColor,
-                onPageChanged = onPageChanged,
+                onPageChanged = { pageIndex ->
+                    onPositionChanged(
+                        activeChapter,
+                        pageIndex
+                    )
+                },
                 onRequestedPageConsumed =
                     onRequestedPageConsumed,
                 onTap = onTap

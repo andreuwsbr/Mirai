@@ -1,5 +1,6 @@
 package com.andrews.mirai.presentation.reader.cache
 
+import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -10,6 +11,11 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
+data class DownloadedReaderImage(
+    val file: File,
+    val aspectRatio: Float
+)
+
 class ReaderImageDownloader(
     private val imageCache: ReaderImageCache,
     private val httpClient: OkHttpClient = OkHttpClient()
@@ -18,8 +24,9 @@ class ReaderImageDownloader(
     suspend fun download(
         imageUrl: String
     ): File = withContext(Dispatchers.IO) {
-
-        val downloadLock = downloadLocks.getOrPut(imageUrl) {
+        val downloadLock = downloadLocks.getOrPut(
+            imageUrl
+        ) {
             Mutex()
         }
 
@@ -28,12 +35,37 @@ class ReaderImageDownloader(
         }
     }
 
+    suspend fun downloadWithInfo(
+        imageUrl: String
+    ): DownloadedReaderImage {
+        val file = download(imageUrl)
+
+        val aspectRatio = aspectRatioCache
+            .getOrPut(imageUrl) {
+                readAspectRatio(file)
+            }
+
+        return DownloadedReaderImage(
+            file = file,
+            aspectRatio = aspectRatio
+        )
+    }
+
+    fun getCachedAspectRatio(
+        imageUrl: String
+    ): Float? {
+        return aspectRatioCache[imageUrl]
+    }
+
     private fun downloadImageIfNecessary(
         imageUrl: String
     ): File {
         val cachedFile = imageCache.getImageFile(imageUrl)
 
-        if (cachedFile.exists() && cachedFile.length() > 0L) {
+        if (
+            cachedFile.exists() &&
+            cachedFile.length() > 0L
+        ) {
             return cachedFile
         }
 
@@ -59,7 +91,6 @@ class ReaderImageDownloader(
                 .newCall(request)
                 .execute()
                 .use { response ->
-
                     if (!response.isSuccessful) {
                         throw IOException(
                             "Erro HTTP ${response.code} ao baixar a imagem."
@@ -100,7 +131,10 @@ class ReaderImageDownloader(
                 temporaryFile.delete()
             }
 
-            if (!cachedFile.exists() || cachedFile.length() <= 0L) {
+            if (
+                !cachedFile.exists() ||
+                cachedFile.length() <= 0L
+            ) {
                 throw IOException(
                     "Não foi possível salvar a imagem no cache."
                 )
@@ -118,8 +152,36 @@ class ReaderImageDownloader(
         }
     }
 
+    private fun readAspectRatio(
+        file: File
+    ): Float {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+
+        BitmapFactory.decodeFile(
+            file.absolutePath,
+            options
+        )
+
+        if (
+            options.outWidth <= 0 ||
+            options.outHeight <= 0
+        ) {
+            throw IOException(
+                "Não foi possível identificar o tamanho da imagem."
+            )
+        }
+
+        return options.outWidth.toFloat() /
+                options.outHeight.toFloat()
+    }
+
     private companion object {
         val downloadLocks =
             ConcurrentHashMap<String, Mutex>()
+
+        val aspectRatioCache =
+            ConcurrentHashMap<String, Float>()
     }
 }

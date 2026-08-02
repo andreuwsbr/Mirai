@@ -1,6 +1,5 @@
 package com.andrews.mirai.presentation.reader.components
 
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,8 +26,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
@@ -44,7 +41,11 @@ fun ReaderPageContent(
     }
 
     var aspectRatio by remember(page.imageUrl) {
-        mutableStateOf<Float?>(null)
+        mutableStateOf(
+            imageDownloader.getCachedAspectRatio(
+                page.imageUrl
+            )
+        )
     }
 
     var isLoading by remember(page.imageUrl) {
@@ -60,18 +61,12 @@ fun ReaderPageContent(
         errorMessage = null
 
         runCatching {
-            val downloadedFile = imageDownloader.download(
+            imageDownloader.downloadWithInfo(
                 page.imageUrl
             )
-
-            val imageAspectRatio = readImageAspectRatio(
-                downloadedFile
-            )
-
-            downloadedFile to imageAspectRatio
-        }.onSuccess { result ->
-            imageFile = result.first
-            aspectRatio = result.second
+        }.onSuccess { downloadedImage ->
+            imageFile = downloadedImage.file
+            aspectRatio = downloadedImage.aspectRatio
         }.onFailure { throwable ->
             errorMessage = throwable.message
                 ?: "Não foi possível carregar esta página."
@@ -80,25 +75,33 @@ fun ReaderPageContent(
         isLoading = false
     }
 
+    val knownAspectRatio = aspectRatio
+
     Box(
-        modifier = if (paged) {
-            Modifier
-                .fillMaxSize()
-                .background(backgroundColor)
-        } else {
-            Modifier
-                .fillMaxWidth()
-                .background(backgroundColor)
+        modifier = when {
+            paged -> {
+                Modifier
+                    .fillMaxSize()
+                    .background(backgroundColor)
+            }
+
+            knownAspectRatio != null -> {
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(knownAspectRatio)
+                    .background(backgroundColor)
+            }
+
+            else -> {
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 280.dp)
+                    .background(backgroundColor)
+            }
         },
         contentAlignment = Alignment.Center
     ) {
         when {
-            isLoading -> {
-                PageLoadingContent(
-                    pageNumber = page.index + 1
-                )
-            }
-
             errorMessage != null -> {
                 Text(
                     text = buildString {
@@ -116,18 +119,19 @@ fun ReaderPageContent(
                 )
             }
 
-            imageFile != null && aspectRatio != null -> {
+            imageFile != null &&
+                    knownAspectRatio != null -> {
                 MiraiReaderImage(
                     imageFileUri = Uri.fromFile(imageFile),
                     zoomEnabled = paged,
                     onTap = onTap,
-                    modifier = if (paged) {
-                        Modifier.fillMaxSize()
-                    } else {
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(aspectRatio!!)
-                    }
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            isLoading -> {
+                PageLoadingContent(
+                    pageNumber = page.index + 1
                 )
             }
         }
@@ -150,34 +154,7 @@ private fun PageLoadingContent(
         Text(
             text = "Carregando página $pageNumber...",
             modifier = Modifier.padding(top = 12.dp),
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
-    }
-}
-
-private suspend fun readImageAspectRatio(
-    file: File
-): Float {
-    return withContext(Dispatchers.IO) {
-        val options = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-
-        BitmapFactory.decodeFile(
-            file.absolutePath,
-            options
-        )
-
-        if (
-            options.outWidth <= 0 ||
-            options.outHeight <= 0
-        ) {
-            throw IllegalStateException(
-                "Não foi possível identificar o tamanho da imagem."
-            )
-        }
-
-        options.outWidth.toFloat() /
-                options.outHeight.toFloat()
     }
 }
