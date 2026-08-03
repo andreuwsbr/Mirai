@@ -19,12 +19,15 @@ data class DownloadedReaderImage(
 
 class ReaderImageDownloader(
     private val imageCache: ReaderImageCache,
-    private val httpClient: OkHttpClient = OkHttpClient()
+    private val httpClient: OkHttpClient =
+        OkHttpClient()
 ) {
 
     suspend fun download(
         imageUrl: String
-    ): File = withContext(Dispatchers.IO) {
+    ): File = withContext(
+        Dispatchers.IO
+    ) {
         val localFile =
             getLocalFileOrNull(
                 imageUrl
@@ -138,7 +141,7 @@ class ReaderImageDownloader(
 
         temporaryFile.delete()
 
-        val request =
+        val requestBuilder =
             Request.Builder()
                 .url(
                     imageUrl
@@ -147,6 +150,30 @@ class ReaderImageDownloader(
                     "User-Agent",
                     USER_AGENT
                 )
+                .header(
+                    "Accept",
+                    IMAGE_ACCEPT_HEADER
+                )
+                .header(
+                    "Accept-Language",
+                    ACCEPT_LANGUAGE_HEADER
+                )
+
+        if (isSaikaiImage(imageUrl)) {
+            requestBuilder
+                .header(
+                    "Origin",
+                    SAIKAI_ORIGIN
+                )
+                .header(
+                    "Referer",
+                    SAIKAI_REFERER
+                )
+        }
+
+        val request =
+            requestBuilder
+                .get()
                 .build()
 
         try {
@@ -173,6 +200,7 @@ class ReaderImageDownloader(
                         .use { inputStream ->
                             temporaryFile
                                 .outputStream()
+                                .buffered()
                                 .use { outputStream ->
                                     inputStream.copyTo(
                                         outputStream
@@ -232,6 +260,25 @@ class ReaderImageDownloader(
         }
     }
 
+    private fun isSaikaiImage(
+        imageUrl: String
+    ): Boolean {
+        val host =
+            runCatching {
+                Uri.parse(
+                    imageUrl
+                ).host
+            }.getOrNull()
+                ?.lowercase()
+                .orEmpty()
+
+        return host ==
+                SAIKAI_IMAGE_HOST ||
+                host.endsWith(
+                    ".$SAIKAI_DOMAIN"
+                )
+    }
+
     private fun readAspectRatio(
         file: File
     ): Float {
@@ -266,7 +313,28 @@ class ReaderImageDownloader(
         const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) " +
                     "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                    "Chrome/120.0.0.0 Mobile Safari/537.36"
+                    "Chrome/126.0 Mobile Safari/537.36"
+
+        const val IMAGE_ACCEPT_HEADER =
+            "image/avif,image/webp," +
+                    "image/apng,image/svg+xml," +
+                    "image/*,*/*;q=0.8"
+
+        const val ACCEPT_LANGUAGE_HEADER =
+            "pt-BR,pt;q=0.9," +
+                    "en-US;q=0.8,en;q=0.7"
+
+        const val SAIKAI_DOMAIN =
+            "housesaikai.net"
+
+        const val SAIKAI_IMAGE_HOST =
+            "s3-beta.housesaikai.net"
+
+        const val SAIKAI_ORIGIN =
+            "https://housesaikai.net"
+
+        const val SAIKAI_REFERER =
+            "https://housesaikai.net/"
 
         val downloadLocks =
             ConcurrentHashMap<String, Mutex>()

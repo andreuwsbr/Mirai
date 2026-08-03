@@ -1,5 +1,6 @@
 package com.andrews.mirai.data.download
 
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -48,17 +49,26 @@ class DownloadImageFetcher(
                 )
                 .header(
                     "Accept",
-                    "image/avif,image/webp," +
-                            "image/apng,image/svg+xml," +
-                            "image/*,*/*;q=0.8"
+                    IMAGE_ACCEPT_HEADER
                 )
                 .header(
                     "Accept-Language",
-                    "pt-BR,pt;q=0.9," +
-                            "en-US;q=0.8,en;q=0.7"
+                    ACCEPT_LANGUAGE_HEADER
                 )
 
-        if (!referer.isNullOrBlank()) {
+        if (isSaikaiImage(imageUrl)) {
+            requestBuilder
+                .header(
+                    "Origin",
+                    SAIKAI_ORIGIN
+                )
+                .header(
+                    "Referer",
+                    SAIKAI_REFERER
+                )
+        } else if (
+            !referer.isNullOrBlank()
+        ) {
             requestBuilder.header(
                 "Referer",
                 referer
@@ -154,12 +164,52 @@ class DownloadImageFetcher(
         }
     }
 
+    private fun isSaikaiImage(
+        imageUrl: String
+    ): Boolean {
+        val host =
+            runCatching {
+                Uri.parse(
+                    imageUrl
+                ).host
+            }.getOrNull()
+                ?.lowercase()
+                .orEmpty()
+
+        return host ==
+                SAIKAI_IMAGE_HOST ||
+                host.endsWith(
+                    ".$SAIKAI_DOMAIN"
+                )
+    }
+
     private companion object {
 
         const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) " +
                     "AppleWebKit/537.36 (KHTML, like Gecko) " +
                     "Chrome/126.0 Mobile Safari/537.36"
+
+        const val IMAGE_ACCEPT_HEADER =
+            "image/avif,image/webp," +
+                    "image/apng,image/svg+xml," +
+                    "image/*,*/*;q=0.8"
+
+        const val ACCEPT_LANGUAGE_HEADER =
+            "pt-BR,pt;q=0.9," +
+                    "en-US;q=0.8,en;q=0.7"
+
+        const val SAIKAI_DOMAIN =
+            "housesaikai.net"
+
+        const val SAIKAI_IMAGE_HOST =
+            "s3-beta.housesaikai.net"
+
+        const val SAIKAI_ORIGIN =
+            "https://housesaikai.net"
+
+        const val SAIKAI_REFERER =
+            "https://housesaikai.net/"
 
         fun createHttpClient():
                 OkHttpClient {

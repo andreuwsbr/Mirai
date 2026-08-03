@@ -19,9 +19,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.andrews.mirai.presentation.components.createMiraiImageModel
 
 @Composable
 fun ContinueReadingCard(
@@ -32,6 +34,15 @@ fun ContinueReadingCard(
     totalPages: Int,
     onClick: () -> Unit
 ) {
+    val context =
+        LocalContext.current
+
+    val resolvedCoverModel =
+        createMiraiImageModel(
+            context = context,
+            model = coverModel
+        )
+
     val progress =
         if (totalPages > 0) {
             (
@@ -68,7 +79,8 @@ fun ContinueReadingCard(
                 Arrangement.spacedBy(16.dp)
         ) {
             AsyncImage(
-                model = coverModel,
+                model =
+                    resolvedCoverModel,
                 contentDescription =
                     "Capa de $title",
                 contentScale =

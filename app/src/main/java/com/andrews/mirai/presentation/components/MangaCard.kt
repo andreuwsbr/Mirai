@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -29,6 +30,15 @@ fun MangaCard(
     coverModel: Any? = manga.coverUrl,
     onClick: () -> Unit = {}
 ) {
+    val context =
+        LocalContext.current
+
+    val resolvedCoverModel =
+        createMiraiImageModel(
+            context = context,
+            model = coverModel
+        )
+
     Column(
         modifier = modifier
             .clickable(
@@ -40,9 +50,9 @@ fun MangaCard(
         verticalArrangement =
             Arrangement.spacedBy(7.dp)
     ) {
-        if (coverModel != null) {
+        if (resolvedCoverModel != null) {
             AsyncImage(
-                model = coverModel,
+                model = resolvedCoverModel,
                 contentDescription =
                     "Capa de ${manga.title}",
                 contentScale =

@@ -45,6 +45,7 @@ import coil3.compose.AsyncImage
 import com.andrews.mirai.data.download.DownloadRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.presentation.components.MiraiHeader
+import com.andrews.mirai.presentation.components.createMiraiImageModel
 import com.andrews.mirai.presentation.components.resolveMangaCoverModel
 import com.andrews.mirai.presentation.reader.progress.ReadingHistoryItem
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
@@ -146,7 +147,8 @@ fun HistoryScreen(
                 )
 
                 Spacer(
-                    modifier = Modifier.width(8.dp)
+                    modifier =
+                        Modifier.width(8.dp)
                 )
 
                 Text(
@@ -156,12 +158,14 @@ fun HistoryScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                bottom = 32.dp
-            ),
+            modifier =
+                Modifier.fillMaxSize(),
+            contentPadding =
+                PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    bottom = 32.dp
+                ),
             verticalArrangement =
                 Arrangement.spacedBy(12.dp)
         ) {
@@ -185,7 +189,8 @@ fun HistoryScreen(
 
                 HistoryCard(
                     item = item,
-                    coverModel = coverModel,
+                    coverModel =
+                        coverModel,
                     onContinueClick = {
                         val chapter =
                             Chapter(
@@ -276,15 +281,27 @@ private fun HistoryCard(
     onContinueClick: () -> Unit,
     onRemoveClick: () -> Unit
 ) {
+    val context =
+        LocalContext.current
+
+    val resolvedCoverModel =
+        createMiraiImageModel(
+            context = context,
+            model = coverModel
+        )
+
     val safeTotalPages =
-        item.totalPages.coerceAtLeast(0)
+        item.totalPages
+            .coerceAtLeast(0)
 
     val currentPage =
         if (safeTotalPages > 0) {
-            (item.pageIndex + 1).coerceIn(
-                minimumValue = 1,
-                maximumValue = safeTotalPages
-            )
+            (item.pageIndex + 1)
+                .coerceIn(
+                    minimumValue = 1,
+                    maximumValue =
+                        safeTotalPages
+                )
         } else {
             item.pageIndex + 1
         }
@@ -298,15 +315,19 @@ private fun HistoryCard(
         }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        modifier =
+            Modifier.fillMaxWidth(),
+        shape =
+            RoundedCornerShape(18.dp),
         tonalElevation = 2.dp
     ) {
         Row(
-            modifier = Modifier.padding(14.dp)
+            modifier =
+                Modifier.padding(14.dp)
         ) {
             AsyncImage(
-                model = coverModel,
+                model =
+                    resolvedCoverModel,
                 contentDescription =
                     "Capa de ${item.mangaTitle}",
                 contentScale =
@@ -315,16 +336,20 @@ private fun HistoryCard(
                     .width(82.dp)
                     .height(118.dp)
                     .clip(
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(
+                            12.dp
+                        )
                     )
             )
 
             Spacer(
-                modifier = Modifier.width(14.dp)
+                modifier =
+                    Modifier.width(14.dp)
             )
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier =
+                    Modifier.weight(1f)
             ) {
                 Row(
                     modifier =
