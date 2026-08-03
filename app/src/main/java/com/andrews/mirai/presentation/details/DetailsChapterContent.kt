@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -53,7 +54,10 @@ internal fun DetailsChapterContent(
     ) {
         Text(
             text = "Capítulos",
-            style = MaterialTheme.typography.titleLarge
+            style =
+                MaterialTheme
+                    .typography
+                    .titleLarge
         )
 
         Spacer(
@@ -75,12 +79,16 @@ internal fun DetailsChapterContent(
         )
 
         Text(
-            text = if (descendingOrder) {
-                "Ordem: mais recente primeiro"
-            } else {
-                "Ordem: mais antigo primeiro"
-            },
-            style = MaterialTheme.typography.bodySmall,
+            text =
+                if (descendingOrder) {
+                    "Ordem: mais recente primeiro"
+                } else {
+                    "Ordem: mais antigo primeiro"
+                },
+            style =
+                MaterialTheme
+                    .typography
+                    .bodySmall,
             color =
                 MaterialTheme
                     .colorScheme
@@ -96,12 +104,19 @@ internal fun DetailsChapterContent(
             chaptersCount > 0
         ) {
             Text(
-                text = if (normalizedQuery.isNotBlank()) {
-                    "$filteredChaptersCount resultado(s)"
-                } else {
-                    "$chaptersCount capítulos encontrados"
-                },
-                style = MaterialTheme.typography.bodySmall,
+                text =
+                    if (
+                        normalizedQuery
+                            .isNotBlank()
+                    ) {
+                        "$filteredChaptersCount resultado(s)"
+                    } else {
+                        "$chaptersCount capítulos encontrados"
+                    },
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall,
                 color =
                     MaterialTheme
                         .colorScheme
@@ -120,7 +135,10 @@ internal fun DetailsChapterContent(
         if (chaptersError != null) {
             Text(
                 text = chaptersError,
-                color = MaterialTheme.colorScheme.error
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .error
             )
         }
 
@@ -130,7 +148,8 @@ internal fun DetailsChapterContent(
             chaptersCount == 0
         ) {
             Text(
-                text = "Nenhum capítulo foi encontrado.",
+                text =
+                    "Nenhum capítulo foi encontrado.",
                 color =
                     MaterialTheme
                         .colorScheme
@@ -181,7 +200,8 @@ internal fun ChapterItem(
             .clickable(
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(14.dp),
+        shape =
+            RoundedCornerShape(14.dp),
         tonalElevation = 2.dp
     ) {
         Row(
@@ -199,7 +219,8 @@ internal fun ChapterItem(
                 Arrangement.spacedBy(8.dp)
         ) {
             Column(
-                modifier = Modifier.weight(1f)
+                modifier =
+                    Modifier.weight(1f)
             ) {
                 Text(
                     text = chapter.name,
@@ -209,13 +230,18 @@ internal fun ChapterItem(
                             .titleMedium
                 )
 
-                if (chapter.uploadedAt.isNotBlank()) {
+                if (
+                    chapter.uploadedAt
+                        .isNotBlank()
+                ) {
                     Spacer(
-                        modifier = Modifier.height(4.dp)
+                        modifier =
+                            Modifier.height(4.dp)
                     )
 
                     Text(
-                        text = chapter.uploadedAt,
+                        text =
+                            chapter.uploadedAt,
                         style =
                             MaterialTheme
                                 .typography
@@ -229,7 +255,8 @@ internal fun ChapterItem(
 
                 if (isViewed) {
                     Spacer(
-                        modifier = Modifier.height(6.dp)
+                        modifier =
+                            Modifier.height(6.dp)
                     )
 
                     Text(
@@ -246,14 +273,18 @@ internal fun ChapterItem(
                 }
 
                 DownloadStatusText(
-                    status = downloadStatus,
-                    progress = downloadProgress
+                    status =
+                        downloadStatus,
+                    progress =
+                        downloadProgress
                 )
             }
 
             ChapterDownloadButton(
-                status = downloadStatus,
-                onClick = onDownloadClick
+                status =
+                    downloadStatus,
+                onClick =
+                    onDownloadClick
             )
         }
     }
@@ -267,10 +298,15 @@ private fun DownloadStatusText(
     val text =
         when (status) {
             DownloadStatus.QUEUED ->
-                "Aguardando download"
+                "Aguardando download • toque para cancelar"
 
             DownloadStatus.DOWNLOADING ->
-                "Baixando: ${progress.coerceIn(0, 100)}%"
+                "Baixando: ${
+                    progress.coerceIn(
+                        0,
+                        100
+                    )
+                }% • toque para cancelar"
 
             DownloadStatus.COMPLETED ->
                 "Disponível offline"
@@ -287,7 +323,8 @@ private fun DownloadStatusText(
 
     if (text != null) {
         Spacer(
-            modifier = Modifier.height(6.dp)
+            modifier =
+                Modifier.height(6.dp)
         )
 
         Text(
@@ -318,26 +355,25 @@ private fun ChapterDownloadButton(
     onClick: () -> Unit
 ) {
     val enabled =
-        status == null ||
-                status == DownloadStatus.FAILED ||
-                status == DownloadStatus.PAUSED
+        status !=
+                DownloadStatus.COMPLETED
 
     IconButton(
         onClick = onClick,
         enabled = enabled
     ) {
         when (status) {
-            DownloadStatus.QUEUED -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.dp
-                )
-            }
-
+            DownloadStatus.QUEUED,
             DownloadStatus.DOWNLOADING -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.dp
+                Icon(
+                    imageVector =
+                        Icons.Outlined.Cancel,
+                    contentDescription =
+                        "Cancelar download",
+                    tint =
+                        MaterialTheme
+                            .colorScheme
+                            .error
                 )
             }
 

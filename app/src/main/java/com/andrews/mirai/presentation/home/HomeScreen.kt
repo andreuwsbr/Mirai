@@ -13,20 +13,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.andrews.mirai.data.download.DownloadRepository
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.presentation.components.MiraiHeader
+import com.andrews.mirai.presentation.components.resolveMangaCoverModel
 import com.andrews.mirai.presentation.home.components.ContinueReadingCard
 import com.andrews.mirai.presentation.home.components.HomeSearchBar
 import com.andrews.mirai.presentation.home.components.HomeSection
@@ -45,44 +48,86 @@ fun HomeScreen(
     ) -> Unit = { _, _ -> }
 ) {
     val applicationContext =
-        LocalContext.current.applicationContext
+        LocalContext
+            .current
+            .applicationContext
 
-    val progressStore = remember(applicationContext) {
-        ReadingProgressStore(applicationContext)
-    }
+    val progressStore =
+        remember(applicationContext) {
+            ReadingProgressStore(
+                applicationContext
+            )
+        }
 
-    val listState = rememberLazyListState()
+    val downloadRepository =
+        remember(applicationContext) {
+            DownloadRepository(
+                applicationContext
+            )
+        }
 
-    val source = SourceRepository.currentSource
+    val downloadedMangas by
+    downloadRepository
+        .observeDownloadedMangas()
+        .collectAsStateWithLifecycle(
+            initialValue = emptyList()
+        )
+
+    val listState =
+        rememberLazyListState()
+
+    val source =
+        SourceRepository.currentSource
 
     var query by rememberSaveable {
         mutableStateOf("")
     }
 
-    var searchExpanded by rememberSaveable {
+    var searchExpanded by
+    rememberSaveable {
         mutableStateOf(false)
     }
 
     var mangas by remember(source.id) {
-        mutableStateOf<List<Manga>>(emptyList())
+        mutableStateOf<List<Manga>>(
+            emptyList()
+        )
     }
 
     var loading by remember(source.id) {
         mutableStateOf(true)
     }
 
-    var errorMessage by remember(source.id) {
-        mutableStateOf<String?>(null)
+    var errorMessage by
+    remember(source.id) {
+        mutableStateOf<String?>(
+            null
+        )
     }
 
     var reloadKey by remember {
         mutableIntStateOf(0)
     }
 
-    val lastReading = progressStore
-        .getHistory()
-        .maxByOrNull { item ->
-            item.readAt
+    val lastReading =
+        progressStore
+            .getHistory()
+            .maxByOrNull { item ->
+                item.readAt
+            }
+
+    val continueReadingCoverModel =
+        lastReading?.let { item ->
+            resolveMangaCoverModel(
+                sourceId =
+                    item.sourceId,
+                mangaId =
+                    item.mangaId,
+                remoteCoverUrl =
+                    item.mangaCoverUrl,
+                downloadedMangas =
+                    downloadedMangas
+            )
         }
 
     LaunchedEffect(
@@ -93,19 +138,26 @@ fun HomeScreen(
         errorMessage = null
 
         try {
-            mangas = withContext(Dispatchers.IO) {
-                source.getPopular(
-                    page = 1
-                )
-            }
+            mangas =
+                withContext(
+                    Dispatchers.IO
+                ) {
+                    source.getPopular(
+                        page = 1
+                    )
+                }
 
             if (mangas.isEmpty()) {
                 errorMessage =
                     "A fonte ${source.name} não retornou nenhuma obra."
             }
-        } catch (exception: CancellationException) {
+        } catch (
+            exception: CancellationException
+        ) {
             throw exception
-        } catch (throwable: Throwable) {
+        } catch (
+            throwable: Throwable
+        ) {
             mangas = emptyList()
 
             errorMessage =
@@ -119,36 +171,44 @@ fun HomeScreen(
     val normalizedQuery =
         query.trim()
 
-    val visibleMangas = remember(
-        mangas,
-        normalizedQuery
-    ) {
-        if (normalizedQuery.isBlank()) {
-            mangas
-        } else {
-            mangas.filter { manga ->
-                manga.title.contains(
-                    other = normalizedQuery,
-                    ignoreCase = true
-                )
+    val visibleMangas =
+        remember(
+            mangas,
+            normalizedQuery
+        ) {
+            if (
+                normalizedQuery.isBlank()
+            ) {
+                mangas
+            } else {
+                mangas.filter { manga ->
+                    manga.title.contains(
+                        other =
+                            normalizedQuery,
+                        ignoreCase = true
+                    )
+                }
             }
         }
-    }
 
     val featuredMangas =
         visibleMangas.take(8)
 
     val exploreMangas =
         visibleMangas
-            .drop(featuredMangas.size)
+            .drop(
+                featuredMangas.size
+            )
             .take(12)
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            bottom = 40.dp
-        ),
+        modifier =
+            Modifier.fillMaxSize(),
+        contentPadding =
+            PaddingValues(
+                bottom = 40.dp
+            ),
         verticalArrangement =
             Arrangement.spacedBy(12.dp)
     ) {
@@ -159,10 +219,12 @@ fun HomeScreen(
             ) {
                 HomeSearchBar(
                     value = query,
-                    onValueChange = { newQuery ->
+                    onValueChange = {
+                            newQuery ->
                         query = newQuery
                     },
-                    expanded = searchExpanded,
+                    expanded =
+                        searchExpanded,
                     onExpand = {
                         searchExpanded = true
                     },
@@ -178,34 +240,45 @@ fun HomeScreen(
             item {
                 ContinueReadingCard(
                     title =
-                        lastReading.mangaTitle,
+                        lastReading
+                            .mangaTitle,
                     chapter =
-                        lastReading.chapterName,
-                    coverUrl =
-                        lastReading.mangaCoverUrl,
+                        lastReading
+                            .chapterName,
+                    coverModel =
+                        continueReadingCoverModel,
                     currentPage =
-                        lastReading.pageIndex + 1,
+                        lastReading
+                            .pageIndex + 1,
                     totalPages =
-                        lastReading.totalPages,
+                        lastReading
+                            .totalPages,
                     onClick = {
-                        val chapter = Chapter(
-                            id =
-                                lastReading.chapterId,
-                            mangaId =
-                                lastReading.mangaId,
-                            name =
-                                lastReading.chapterName,
-                            number =
-                                extractChapterNumber(
-                                    lastReading.chapterName
-                                ),
-                            url =
-                                lastReading.chapterId
-                        )
+                        val chapter =
+                            Chapter(
+                                id =
+                                    lastReading
+                                        .chapterId,
+                                mangaId =
+                                    lastReading
+                                        .mangaId,
+                                name =
+                                    lastReading
+                                        .chapterName,
+                                number =
+                                    extractChapterNumber(
+                                        lastReading
+                                            .chapterName
+                                    ),
+                                url =
+                                    lastReading
+                                        .chapterId
+                            )
 
                         onContinueReadingClick(
                             chapter,
-                            lastReading.sourceId
+                            lastReading
+                                .sourceId
                         )
                     }
                 )
@@ -220,7 +293,8 @@ fun HomeScreen(
                             .fillParentMaxSize()
                             .padding(32.dp),
                         horizontalAlignment =
-                            Alignment.CenterHorizontally,
+                            Alignment
+                                .CenterHorizontally,
                         verticalArrangement =
                             Arrangement.Center
                     ) {
@@ -229,9 +303,10 @@ fun HomeScreen(
                         Text(
                             text =
                                 "Carregando ${source.name}...",
-                            modifier = Modifier.padding(
-                                top = 12.dp
-                            )
+                            modifier =
+                                Modifier.padding(
+                                    top = 12.dp
+                                )
                         )
                     }
                 }
@@ -244,12 +319,14 @@ fun HomeScreen(
                             .fillParentMaxSize()
                             .padding(24.dp),
                         horizontalAlignment =
-                            Alignment.CenterHorizontally,
+                            Alignment
+                                .CenterHorizontally,
                         verticalArrangement =
                             Arrangement.Center
                     ) {
                         Text(
-                            text = errorMessage!!,
+                            text =
+                                errorMessage!!,
                             color =
                                 MaterialTheme
                                     .colorScheme
@@ -260,12 +337,14 @@ fun HomeScreen(
                             onClick = {
                                 reloadKey++
                             },
-                            modifier = Modifier.padding(
-                                top = 16.dp
-                            )
+                            modifier =
+                                Modifier.padding(
+                                    top = 16.dp
+                                )
                         ) {
                             Text(
-                                text = "Tentar novamente"
+                                text =
+                                    "Tentar novamente"
                             )
                         }
                     }
@@ -277,20 +356,40 @@ fun HomeScreen(
                     Text(
                         text =
                             "Nenhuma obra encontrada para \"$normalizedQuery\".",
-                        modifier = Modifier.padding(20.dp)
+                        modifier =
+                            Modifier.padding(
+                                20.dp
+                            )
                     )
                 }
             }
 
             else -> {
-                if (featuredMangas.isNotEmpty()) {
+                if (
+                    featuredMangas
+                        .isNotEmpty()
+                ) {
                     item {
                         HomeSection(
-                            title = "Destaques"
+                            title =
+                                "Destaques"
                         ) {
                             MangaHorizontalRow(
                                 mangas =
                                     featuredMangas,
+                                coverModelProvider = {
+                                        manga ->
+                                    resolveMangaCoverModel(
+                                        sourceId =
+                                            source.id,
+                                        mangaId =
+                                            manga.id,
+                                        remoteCoverUrl =
+                                            manga.coverUrl,
+                                        downloadedMangas =
+                                            downloadedMangas
+                                    )
+                                },
                                 onMangaClick =
                                     onMangaClick
                             )
@@ -298,7 +397,10 @@ fun HomeScreen(
                     }
                 }
 
-                if (exploreMangas.isNotEmpty()) {
+                if (
+                    exploreMangas
+                        .isNotEmpty()
+                ) {
                     item {
                         HomeSection(
                             title =
@@ -307,6 +409,19 @@ fun HomeScreen(
                             MangaHorizontalRow(
                                 mangas =
                                     exploreMangas,
+                                coverModelProvider = {
+                                        manga ->
+                                    resolveMangaCoverModel(
+                                        sourceId =
+                                            source.id,
+                                        mangaId =
+                                            manga.id,
+                                        remoteCoverUrl =
+                                            manga.coverUrl,
+                                        downloadedMangas =
+                                            downloadedMangas
+                                    )
+                                },
                                 onMangaClick =
                                     onMangaClick
                             )
@@ -322,11 +437,15 @@ private fun extractChapterNumber(
     chapterName: String
 ): Double {
     return Regex(
-        pattern = """\d+(?:[.,]\d+)?"""
+        pattern =
+            """\d+(?:[.,]\d+)?"""
     )
         .find(chapterName)
         ?.value
-        ?.replace(",", ".")
+        ?.replace(
+            oldValue = ",",
+            newValue = "."
+        )
         ?.toDoubleOrNull()
         ?: 0.0
 }

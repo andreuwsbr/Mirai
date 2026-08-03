@@ -172,6 +172,20 @@ class DownloadRepository(
         )
     }
 
+    suspend fun updateCoverLocalPath(
+        sourceId: String,
+        mangaId: String,
+        coverLocalPath: String?
+    ) {
+        downloadDao.updateCoverLocalPath(
+            sourceId = sourceId,
+            mangaId = mangaId,
+            coverLocalPath = coverLocalPath,
+            updatedAt =
+                System.currentTimeMillis()
+        )
+    }
+
     suspend fun updateProgress(
         request: ChapterDownloadRequest,
         downloadedPages: Int,

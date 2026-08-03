@@ -18,14 +18,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.andrews.mirai.data.download.DownloadRepository
 import com.andrews.mirai.data.local.FavoriteStore
 import com.andrews.mirai.domain.model.Manga
 import com.andrews.mirai.presentation.components.MangaCard
 import com.andrews.mirai.presentation.components.MiraiHeader
+import com.andrews.mirai.presentation.components.resolveMangaCoverModel
 
 @Composable
 fun LibraryScreen(
@@ -34,9 +38,29 @@ fun LibraryScreen(
         sourceId: String
     ) -> Unit
 ) {
-    val favoriteEntries by FavoriteStore
+    val applicationContext =
+        LocalContext
+            .current
+            .applicationContext
+
+    val downloadRepository =
+        remember(applicationContext) {
+            DownloadRepository(
+                applicationContext
+            )
+        }
+
+    val favoriteEntries by
+    FavoriteStore
         .favoriteEntries
         .collectAsStateWithLifecycle()
+
+    val downloadedMangas by
+    downloadRepository
+        .observeDownloadedMangas()
+        .collectAsStateWithLifecycle(
+            initialValue = emptyList()
+        )
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -74,11 +98,26 @@ fun LibraryScreen(
                         "${entry.sourceId}|${entry.manga.id}"
                     }
                 ) { entry ->
-                    val manga = entry.manga
-                    val sourceId = entry.sourceId
+                    val manga =
+                        entry.manga
+
+                    val sourceId =
+                        entry.sourceId
+
+                    val coverModel =
+                        resolveMangaCoverModel(
+                            sourceId = sourceId,
+                            mangaId = manga.id,
+                            remoteCoverUrl =
+                                manga.coverUrl,
+                            downloadedMangas =
+                                downloadedMangas
+                        )
 
                     FavoriteMangaCard(
                         manga = manga,
+                        coverModel =
+                            coverModel,
                         onMangaClick = {
                             onMangaClick(
                                 manga,
@@ -86,10 +125,13 @@ fun LibraryScreen(
                             )
                         },
                         onRemoveFavorite = {
-                            FavoriteStore.removeFavorite(
-                                mangaId = manga.id,
-                                sourceId = sourceId
-                            )
+                            FavoriteStore
+                                .removeFavorite(
+                                    mangaId =
+                                        manga.id,
+                                    sourceId =
+                                        sourceId
+                                )
                         }
                     )
                 }
@@ -101,19 +143,23 @@ fun LibraryScreen(
 @Composable
 private fun FavoriteMangaCard(
     manga: Manga,
+    coverModel: Any?,
     onMangaClick: () -> Unit,
     onRemoveFavorite: () -> Unit
 ) {
     Box {
         MangaCard(
             manga = manga,
+            coverModel = coverModel,
             onClick = onMangaClick
         )
 
         FilledIconButton(
             onClick = onRemoveFavorite,
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .align(
+                    Alignment.TopEnd
+                )
                 .padding(8.dp)
         ) {
             Icon(
@@ -122,7 +168,9 @@ private fun FavoriteMangaCard(
                 contentDescription =
                     "Remover ${manga.title} dos favoritos",
                 tint =
-                    MaterialTheme.colorScheme.onPrimary
+                    MaterialTheme
+                        .colorScheme
+                        .onPrimary
             )
         }
     }
@@ -133,8 +181,10 @@ private fun EmptyLibrary(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier.padding(24.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier.padding(24.dp),
+        contentAlignment =
+            Alignment.Center
     ) {
         Column(
             horizontalAlignment =
@@ -157,9 +207,10 @@ private fun EmptyLibrary(
                     MaterialTheme
                         .typography
                         .titleMedium,
-                modifier = Modifier.padding(
-                    top = 12.dp
-                )
+                modifier =
+                    Modifier.padding(
+                        top = 12.dp
+                    )
             )
 
             Text(
@@ -173,9 +224,10 @@ private fun EmptyLibrary(
                     MaterialTheme
                         .colorScheme
                         .onSurfaceVariant,
-                modifier = Modifier.padding(
-                    top = 6.dp
-                )
+                modifier =
+                    Modifier.padding(
+                        top = 6.dp
+                    )
             )
         }
     }

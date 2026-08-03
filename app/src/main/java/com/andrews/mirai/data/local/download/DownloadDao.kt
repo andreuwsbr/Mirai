@@ -55,6 +55,22 @@ interface DownloadDao {
 
     @Query(
         """
+        UPDATE downloaded_mangas
+        SET coverLocalPath = :coverLocalPath,
+            updatedAt = :updatedAt
+        WHERE sourceId = :sourceId
+        AND mangaId = :mangaId
+        """
+    )
+    suspend fun updateCoverLocalPath(
+        sourceId: String,
+        mangaId: String,
+        coverLocalPath: String?,
+        updatedAt: Long
+    )
+
+    @Query(
+        """
         SELECT *
         FROM downloaded_chapters
         WHERE sourceId = :sourceId

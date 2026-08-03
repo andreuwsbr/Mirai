@@ -26,6 +26,7 @@ import com.andrews.mirai.domain.model.Manga
 fun MangaCard(
     manga: Manga,
     modifier: Modifier = Modifier,
+    coverModel: Any? = manga.coverUrl,
     onClick: () -> Unit = {}
 ) {
     Column(
@@ -39,9 +40,9 @@ fun MangaCard(
         verticalArrangement =
             Arrangement.spacedBy(7.dp)
     ) {
-        if (!manga.coverUrl.isNullOrBlank()) {
+        if (coverModel != null) {
             AsyncImage(
-                model = manga.coverUrl,
+                model = coverModel,
                 contentDescription =
                     "Capa de ${manga.title}",
                 contentScale =
@@ -70,9 +71,10 @@ fun MangaCard(
                     Alignment.Center
             ) {
                 Text(
-                    text = manga.title
-                        .take(1)
-                        .uppercase(),
+                    text =
+                        manga.title
+                            .take(1)
+                            .uppercase(),
                     style =
                         MaterialTheme
                             .typography
@@ -101,7 +103,8 @@ fun MangaCard(
         )
 
         Text(
-            text = manga.type.displayName,
+            text =
+                manga.type.displayName,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(

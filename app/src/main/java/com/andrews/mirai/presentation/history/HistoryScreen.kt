@@ -40,9 +40,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.andrews.mirai.data.download.DownloadRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.presentation.components.MiraiHeader
+import com.andrews.mirai.presentation.components.resolveMangaCoverModel
 import com.andrews.mirai.presentation.reader.progress.ReadingHistoryItem
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import java.text.SimpleDateFormat
@@ -57,7 +60,9 @@ fun HistoryScreen(
     ) -> Unit = { _, _ -> }
 ) {
     val applicationContext =
-        LocalContext.current.applicationContext
+        LocalContext
+            .current
+            .applicationContext
 
     val progressStore =
         remember(applicationContext) {
@@ -65,6 +70,20 @@ fun HistoryScreen(
                 applicationContext
             )
         }
+
+    val downloadRepository =
+        remember(applicationContext) {
+            DownloadRepository(
+                applicationContext
+            )
+        }
+
+    val downloadedMangas by
+    downloadRepository
+        .observeDownloadedMangas()
+        .collectAsStateWithLifecycle(
+            initialValue = emptyList()
+        )
 
     var refreshKey by remember {
         mutableIntStateOf(0)
@@ -74,13 +93,14 @@ fun HistoryScreen(
         mutableStateOf(false)
     }
 
-    val history = remember(refreshKey) {
-        progressStore
-            .getHistory()
-            .sortedByDescending { item ->
-                item.readAt
-            }
-    }
+    val history =
+        remember(refreshKey) {
+            progressStore
+                .getHistory()
+                .sortedByDescending { item ->
+                    item.readAt
+                }
+        }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -151,19 +171,37 @@ fun HistoryScreen(
                     "${item.sourceId}|${item.mangaId}"
                 }
             ) { item ->
+                val coverModel =
+                    resolveMangaCoverModel(
+                        sourceId =
+                            item.sourceId,
+                        mangaId =
+                            item.mangaId,
+                        remoteCoverUrl =
+                            item.mangaCoverUrl,
+                        downloadedMangas =
+                            downloadedMangas
+                    )
+
                 HistoryCard(
                     item = item,
+                    coverModel = coverModel,
                     onContinueClick = {
-                        val chapter = Chapter(
-                            id = item.chapterId,
-                            mangaId = item.mangaId,
-                            name = item.chapterName,
-                            number =
-                                extractChapterNumber(
-                                    item.chapterName
-                                ),
-                            url = item.chapterId
-                        )
+                        val chapter =
+                            Chapter(
+                                id =
+                                    item.chapterId,
+                                mangaId =
+                                    item.mangaId,
+                                name =
+                                    item.chapterName,
+                                number =
+                                    extractChapterNumber(
+                                        item.chapterName
+                                    ),
+                                url =
+                                    item.chapterId
+                            )
 
                         onContinueReading(
                             chapter,
@@ -234,6 +272,7 @@ fun HistoryScreen(
 @Composable
 private fun HistoryCard(
     item: ReadingHistoryItem,
+    coverModel: Any?,
     onContinueClick: () -> Unit,
     onRemoveClick: () -> Unit
 ) {
@@ -267,10 +306,11 @@ private fun HistoryCard(
             modifier = Modifier.padding(14.dp)
         ) {
             AsyncImage(
-                model = item.mangaCoverUrl,
+                model = coverModel,
                 contentDescription =
                     "Capa de ${item.mangaTitle}",
-                contentScale = ContentScale.Crop,
+                contentScale =
+                    ContentScale.Crop,
                 modifier = Modifier
                     .width(82.dp)
                     .height(118.dp)
@@ -293,7 +333,8 @@ private fun HistoryCard(
                         Alignment.Top
                 ) {
                     Text(
-                        text = item.mangaTitle,
+                        text =
+                            item.mangaTitle,
                         modifier =
                             Modifier.weight(1f),
                         style =
@@ -306,7 +347,8 @@ private fun HistoryCard(
                     )
 
                     IconButton(
-                        onClick = onRemoveClick
+                        onClick =
+                            onRemoveClick
                     ) {
                         Icon(
                             imageVector =
@@ -318,7 +360,8 @@ private fun HistoryCard(
                 }
 
                 Text(
-                    text = item.chapterName,
+                    text =
+                        item.chapterName,
                     style =
                         MaterialTheme
                             .typography
@@ -326,7 +369,8 @@ private fun HistoryCard(
                 )
 
                 Spacer(
-                    modifier = Modifier.height(6.dp)
+                    modifier =
+                        Modifier.height(6.dp)
                 )
 
                 Text(
@@ -365,7 +409,8 @@ private fun HistoryCard(
                 }
 
                 Spacer(
-                    modifier = Modifier.height(6.dp)
+                    modifier =
+                        Modifier.height(6.dp)
                 )
 
                 Text(
@@ -384,11 +429,13 @@ private fun HistoryCard(
                 )
 
                 Spacer(
-                    modifier = Modifier.height(10.dp)
+                    modifier =
+                        Modifier.height(10.dp)
                 )
 
                 Button(
-                    onClick = onContinueClick,
+                    onClick =
+                        onContinueClick,
                     modifier =
                         Modifier.align(
                             Alignment.End
@@ -408,8 +455,10 @@ private fun EmptyHistory(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier.padding(24.dp),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier.padding(24.dp),
+        contentAlignment =
+            Alignment.Center
     ) {
         Column(
             horizontalAlignment =
@@ -426,7 +475,8 @@ private fun EmptyHistory(
             )
 
             Spacer(
-                modifier = Modifier.height(12.dp)
+                modifier =
+                    Modifier.height(12.dp)
             )
 
             Text(
@@ -439,7 +489,8 @@ private fun EmptyHistory(
             )
 
             Spacer(
-                modifier = Modifier.height(6.dp)
+                modifier =
+                    Modifier.height(6.dp)
             )
 
             Text(
@@ -465,10 +516,11 @@ private fun formatReadDate(
         return "Data não informada"
     }
 
-    val formatter = SimpleDateFormat(
-        "dd/MM/yyyy • HH:mm",
-        Locale.getDefault()
-    )
+    val formatter =
+        SimpleDateFormat(
+            "dd/MM/yyyy • HH:mm",
+            Locale.getDefault()
+        )
 
     return formatter.format(
         Date(timestamp)
@@ -479,11 +531,15 @@ private fun extractChapterNumber(
     chapterName: String
 ): Double {
     return Regex(
-        pattern = """\d+(?:[.,]\d+)?"""
+        pattern =
+            """\d+(?:[.,]\d+)?"""
     )
         .find(chapterName)
         ?.value
-        ?.replace(",", ".")
+        ?.replace(
+            oldValue = ",",
+            newValue = "."
+        )
         ?.toDoubleOrNull()
         ?: 0.0
 }

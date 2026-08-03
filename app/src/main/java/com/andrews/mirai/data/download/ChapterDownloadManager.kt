@@ -52,7 +52,8 @@ class ChapterDownloadManager(
     ) {
         repository.updateStatus(
             request = request,
-            status = DownloadStatus.QUEUED,
+            status =
+                DownloadStatus.QUEUED,
             errorMessage = null
         )
 
@@ -77,9 +78,27 @@ class ChapterDownloadManager(
 
         repository.updateStatus(
             request = request,
-            status = DownloadStatus.PAUSED,
+            status =
+                DownloadStatus.PAUSED,
             errorMessage =
                 "Download pausado."
+        )
+    }
+
+    suspend fun cancelAndDelete(
+        request: ChapterDownloadRequest
+    ): Boolean {
+        workManager.cancelUniqueWork(
+            uniqueWorkName(request)
+        )
+
+        return repository.deleteChapter(
+            sourceId =
+                request.sourceId,
+            mangaId =
+                request.mangaId,
+            chapterId =
+                request.chapterId
         )
     }
 
@@ -157,9 +176,12 @@ class ChapterDownloadManager(
         request: ChapterDownloadRequest
     ): String {
         return uniqueWorkName(
-            sourceId = request.sourceId,
-            mangaId = request.mangaId,
-            chapterId = request.chapterId
+            sourceId =
+                request.sourceId,
+            mangaId =
+                request.mangaId,
+            chapterId =
+                request.chapterId
         )
     }
 

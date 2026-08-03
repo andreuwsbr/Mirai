@@ -29,6 +29,12 @@ class ChapterDownloadWorker(
     private val imageFetcher =
         DownloadImageFetcher()
 
+    private val coverDownloader =
+        MangaCoverDownloader(
+            fileStore = fileStore,
+            imageFetcher = imageFetcher
+        )
+
     override suspend fun doWork():
             Result {
         val workKey =
@@ -98,9 +104,14 @@ class ChapterDownloadWorker(
                     DownloadStatus.DOWNLOADING
             )
 
+            downloadCoverIfNecessary(
+                request
+            )
+
             val chapter =
                 Chapter(
-                    id = chapterEntity.chapterId,
+                    id =
+                        chapterEntity.chapterId,
                     mangaId =
                         chapterEntity.mangaId,
                     name =
@@ -131,8 +142,11 @@ class ChapterDownloadWorker(
                 )
             }
 
-            var downloadedPages = 0
-            var downloadedSizeBytes = 0L
+            var downloadedPages =
+                0
+
+            var downloadedSizeBytes =
+                0L
 
             pages.forEachIndexed {
                     pagePosition,
@@ -178,7 +192,8 @@ class ChapterDownloadWorker(
                         chapterEntity.chapterUrl
                 )
 
-                downloadedPages += 1
+                downloadedPages +=
+                    1
 
                 downloadedSizeBytes +=
                     destinationFile.length()
@@ -197,8 +212,10 @@ class ChapterDownloadWorker(
                     workDataOf(
                         PROGRESS_DOWNLOADED_PAGES to
                                 downloadedPages,
+
                         PROGRESS_TOTAL_PAGES to
                                 pages.size,
+
                         PROGRESS_PERCENT to
                                 calculateProgress(
                                     downloadedPages =
@@ -218,9 +235,12 @@ class ChapterDownloadWorker(
                 workDataOf(
                     PROGRESS_DOWNLOADED_PAGES to
                             pages.size,
+
                     PROGRESS_TOTAL_PAGES to
                             pages.size,
-                    PROGRESS_PERCENT to 100
+
+                    PROGRESS_PERCENT to
+                            100
                 )
             )
         } catch (exception: IOException) {
@@ -244,6 +264,54 @@ class ChapterDownloadWorker(
         }
     }
 
+    private suspend fun downloadCoverIfNecessary(
+        request: ChapterDownloadRequest
+    ) {
+        val existingManga =
+            repository.getDownloadedManga(
+                sourceId = request.sourceId,
+                mangaId = request.mangaId
+            )
+
+        val existingCoverPath =
+            existingManga
+                ?.coverLocalPath
+
+        val existingCoverIsValid =
+            !existingCoverPath.isNullOrBlank() &&
+                    java.io.File(
+                        existingCoverPath
+                    ).let { file ->
+                        file.exists() &&
+                                file.isFile &&
+                                file.length() > 0L
+                    }
+
+        if (existingCoverIsValid) {
+            return
+        }
+
+        /*
+         * A falha da capa não deve impedir
+         * o download do capítulo.
+         */
+        runCatching {
+            coverDownloader.downloadCover(
+                request
+            )
+        }.getOrNull()
+            ?.let { coverFile ->
+                repository.updateCoverLocalPath(
+                    sourceId =
+                        request.sourceId,
+                    mangaId =
+                        request.mangaId,
+                    coverLocalPath =
+                        coverFile.absolutePath
+                )
+            }
+    }
+
     private suspend fun failDownload(
         request: ChapterDownloadRequest,
         message: String
@@ -252,7 +320,8 @@ class ChapterDownloadWorker(
             request = request,
             status =
                 DownloadStatus.FAILED,
-            errorMessage = message
+            errorMessage =
+                message
         )
 
         return Result.failure(
@@ -306,7 +375,8 @@ class ChapterDownloadWorker(
             "gif",
             "avif" -> extension
 
-            else -> DEFAULT_IMAGE_EXTENSION
+            else ->
+                DEFAULT_IMAGE_EXTENSION
         }
     }
 

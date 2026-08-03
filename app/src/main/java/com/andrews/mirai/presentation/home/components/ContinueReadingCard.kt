@@ -27,94 +27,143 @@ import coil3.compose.AsyncImage
 fun ContinueReadingCard(
     title: String,
     chapter: String,
-    coverUrl: String?,
+    coverModel: Any?,
     currentPage: Int,
     totalPages: Int,
     onClick: () -> Unit
 ) {
-    val progress = if (totalPages > 0) {
-        (currentPage.toFloat() / totalPages.toFloat())
-            .coerceIn(0f, 1f)
-    } else {
-        0f
-    }
+    val progress =
+        if (totalPages > 0) {
+            (
+                    currentPage.toFloat() /
+                            totalPages.toFloat()
+                    ).coerceIn(
+                    minimumValue = 0f,
+                    maximumValue = 1f
+                )
+        } else {
+            0f
+        }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(22.dp),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 4.dp
-        )
+            .padding(
+                horizontal = 20.dp
+            )
+            .clickable(
+                onClick = onClick
+            ),
+        shape =
+            RoundedCornerShape(22.dp),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = 4.dp
+            )
     ) {
         Row(
-            modifier = Modifier.padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            modifier =
+                Modifier.padding(18.dp),
+            horizontalArrangement =
+                Arrangement.spacedBy(16.dp)
         ) {
             AsyncImage(
-                model = coverUrl,
-                contentDescription = "Capa de $title",
-                contentScale = ContentScale.Crop,
+                model = coverModel,
+                contentDescription =
+                    "Capa de $title",
+                contentScale =
+                    ContentScale.Crop,
                 modifier = Modifier
                     .size(
                         width = 74.dp,
                         height = 108.dp
                     )
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(
+                        RoundedCornerShape(
+                            14.dp
+                        )
+                    )
             )
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier =
+                    Modifier.weight(1f)
             ) {
                 Text(
-                    text = "CONTINUE LENDO",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    text =
+                        "CONTINUE LENDO",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelMedium,
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .primary
                 )
 
                 Spacer(
-                    modifier = Modifier.height(8.dp)
+                    modifier =
+                        Modifier.height(8.dp)
                 )
 
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .titleLarge,
+                    fontWeight =
+                        FontWeight.Bold,
                     maxLines = 2
                 )
 
                 Spacer(
-                    modifier = Modifier.height(4.dp)
+                    modifier =
+                        Modifier.height(4.dp)
                 )
 
                 Text(
                     text = chapter,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium,
+                    color =
+                        MaterialTheme
+                            .colorScheme
+                            .onSurfaceVariant
                 )
 
                 Spacer(
-                    modifier = Modifier.height(14.dp)
+                    modifier =
+                        Modifier.height(14.dp)
                 )
 
                 LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth()
+                    progress = {
+                        progress
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
 
                 Spacer(
-                    modifier = Modifier.height(8.dp)
+                    modifier =
+                        Modifier.height(8.dp)
                 )
 
                 Text(
-                    text = if (totalPages > 0) {
-                        "Página $currentPage de $totalPages"
-                    } else {
-                        "Página $currentPage"
-                    },
-                    style = MaterialTheme.typography.labelMedium
+                    text =
+                        if (totalPages > 0) {
+                            "Página $currentPage de $totalPages"
+                        } else {
+                            "Página $currentPage"
+                        },
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelMedium
                 )
             }
         }

@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.andrews.mirai.BuildConfig
 import com.andrews.mirai.presentation.components.MiraiHeader
+import com.andrews.mirai.presentation.downloads.DownloadsScreen
 
 private const val DISCORD_URL =
     "https://discord.gg/vyp4pdHbK8"
@@ -42,6 +43,7 @@ private enum class SettingsPage {
     APPEARANCE,
     READER,
     STORAGE,
+    DOWNLOADS,
     ABOUT
 }
 
@@ -52,50 +54,70 @@ fun SettingsScreen(
     onLogoutClick: () -> Unit
 ) {
     var currentPage by remember {
-        mutableStateOf(SettingsPage.MAIN)
+        mutableStateOf(
+            SettingsPage.MAIN
+        )
     }
 
     BackHandler(
-        enabled = currentPage != SettingsPage.MAIN
+        enabled =
+            currentPage != SettingsPage.MAIN
     ) {
-        currentPage = SettingsPage.MAIN
+        currentPage =
+            when (currentPage) {
+                SettingsPage.DOWNLOADS ->
+                    SettingsPage.STORAGE
+
+                else ->
+                    SettingsPage.MAIN
+            }
     }
 
     when (currentPage) {
         SettingsPage.MAIN -> {
             MainSettingsPage(
-                currentUserEmail = currentUserEmail,
+                currentUserEmail =
+                    currentUserEmail,
                 onAccountClick = {
                     if (currentUserEmail == null) {
                         onAuthenticationClick()
                     } else {
-                        currentPage = SettingsPage.ACCOUNT
+                        currentPage =
+                            SettingsPage.ACCOUNT
                     }
                 },
                 onAppearanceClick = {
-                    currentPage = SettingsPage.APPEARANCE
+                    currentPage =
+                        SettingsPage.APPEARANCE
                 },
                 onReaderClick = {
-                    currentPage = SettingsPage.READER
+                    currentPage =
+                        SettingsPage.READER
                 },
                 onStorageClick = {
-                    currentPage = SettingsPage.STORAGE
+                    currentPage =
+                        SettingsPage.STORAGE
                 },
                 onAboutClick = {
-                    currentPage = SettingsPage.ABOUT
+                    currentPage =
+                        SettingsPage.ABOUT
                 }
             )
         }
 
         SettingsPage.ACCOUNT -> {
             AccountSettingsPage(
-                email = currentUserEmail.orEmpty(),
+                email =
+                    currentUserEmail.orEmpty(),
                 onLogoutClick = {
                     onLogoutClick()
-                    currentPage = SettingsPage.MAIN
+
+                    currentPage =
+                        SettingsPage.MAIN
                 },
                 onBackClick = {
-                    currentPage = SettingsPage.MAIN
+                    currentPage =
+                        SettingsPage.MAIN
                 }
             )
         }
@@ -103,7 +125,8 @@ fun SettingsScreen(
         SettingsPage.APPEARANCE -> {
             AppearanceSettingsPage(
                 onBackClick = {
-                    currentPage = SettingsPage.MAIN
+                    currentPage =
+                        SettingsPage.MAIN
                 }
             )
         }
@@ -111,7 +134,8 @@ fun SettingsScreen(
         SettingsPage.READER -> {
             ReaderSettingsPage(
                 onBackClick = {
-                    currentPage = SettingsPage.MAIN
+                    currentPage =
+                        SettingsPage.MAIN
                 }
             )
         }
@@ -119,7 +143,21 @@ fun SettingsScreen(
         SettingsPage.STORAGE -> {
             StorageSettingsPage(
                 onBackClick = {
-                    currentPage = SettingsPage.MAIN
+                    currentPage =
+                        SettingsPage.MAIN
+                },
+                onManageDownloadsClick = {
+                    currentPage =
+                        SettingsPage.DOWNLOADS
+                }
+            )
+        }
+
+        SettingsPage.DOWNLOADS -> {
+            DownloadsScreen(
+                onBackClick = {
+                    currentPage =
+                        SettingsPage.STORAGE
                 }
             )
         }
@@ -127,7 +165,8 @@ fun SettingsScreen(
         SettingsPage.ABOUT -> {
             AboutSettingsPage(
                 onBackClick = {
-                    currentPage = SettingsPage.MAIN
+                    currentPage =
+                        SettingsPage.MAIN
                 }
             )
         }
@@ -151,7 +190,8 @@ private fun MainSettingsPage(
     ) {
         MiraiHeader(
             title = "Ajustes",
-            subtitle = "Personalize sua experiência"
+            subtitle =
+                "Personalize sua experiência"
         )
 
         LazyColumn(
@@ -166,7 +206,8 @@ private fun MainSettingsPage(
                     icon = {
                         Icon(
                             imageVector =
-                                Icons.Outlined.AccountCircle,
+                                Icons.Outlined
+                                    .AccountCircle,
                             contentDescription = null
                         )
                     },
@@ -179,7 +220,8 @@ private fun MainSettingsPage(
                     subtitle =
                         currentUserEmail
                             ?: "Sincronize favoritos, histórico e progresso",
-                    onClick = onAccountClick
+                    onClick =
+                        onAccountClick
                 )
             }
 
@@ -199,7 +241,8 @@ private fun MainSettingsPage(
                     title = "Aparência",
                     subtitle =
                         "Tema claro, escuro ou do sistema",
-                    onClick = onAppearanceClick
+                    onClick =
+                        onAppearanceClick
                 )
 
                 SettingsNavigationItem(
@@ -213,7 +256,8 @@ private fun MainSettingsPage(
                     title = "Leitor",
                     subtitle =
                         "Tela ligada, tela cheia e páginas",
-                    onClick = onReaderClick
+                    onClick =
+                        onReaderClick
                 )
 
                 SettingsNavigationItem(
@@ -226,8 +270,9 @@ private fun MainSettingsPage(
                     },
                     title = "Armazenamento",
                     subtitle =
-                        "Cache e histórico de leitura",
-                    onClick = onStorageClick
+                        "Cache, downloads e histórico",
+                    onClick =
+                        onStorageClick
                 )
             }
 
@@ -248,7 +293,9 @@ private fun MainSettingsPage(
                     subtitle =
                         "Comunidade, suporte, sugestões e bugs",
                     onClick = {
-                        openDiscord(context)
+                        openDiscord(
+                            context
+                        )
                     }
                 )
             }
@@ -269,11 +316,13 @@ private fun MainSettingsPage(
                     title = "Sobre",
                     subtitle =
                         "Versão ${BuildConfig.VERSION_NAME}",
-                    onClick = onAboutClick
+                    onClick =
+                        onAboutClick
                 )
 
                 Spacer(
-                    modifier = Modifier.height(24.dp)
+                    modifier =
+                        Modifier.height(24.dp)
                 )
             }
         }
@@ -291,22 +340,28 @@ private fun AccountSettingsPage(
         onBackClick = onBackClick
     ) {
         Column(
-            modifier = Modifier.padding(24.dp)
+            modifier =
+                Modifier.padding(24.dp)
         ) {
             Text(
                 text = "Conta conectada",
                 style =
-                    MaterialTheme.typography.titleLarge
+                    MaterialTheme
+                        .typography
+                        .titleLarge
             )
 
             Spacer(
-                modifier = Modifier.height(8.dp)
+                modifier =
+                    Modifier.height(8.dp)
             )
 
             Text(
                 text = email,
                 style =
-                    MaterialTheme.typography.bodyLarge,
+                    MaterialTheme
+                        .typography
+                        .bodyLarge,
                 color =
                     MaterialTheme
                         .colorScheme
@@ -314,7 +369,8 @@ private fun AccountSettingsPage(
             )
 
             Spacer(
-                modifier = Modifier.height(24.dp)
+                modifier =
+                    Modifier.height(24.dp)
             )
 
             SettingsActionItem(
@@ -328,7 +384,8 @@ private fun AccountSettingsPage(
                 title = "Sair da conta",
                 subtitle =
                     "Os dados locais continuarão no dispositivo",
-                onClick = onLogoutClick
+                onClick =
+                    onLogoutClick
             )
         }
     }
@@ -346,30 +403,40 @@ private fun AboutSettingsPage(
         onBackClick = onBackClick
     ) {
         Column(
-            modifier = Modifier.padding(24.dp)
+            modifier =
+                Modifier.padding(24.dp)
         ) {
             Text(
                 text = "未来",
                 style =
-                    MaterialTheme.typography.displayMedium,
+                    MaterialTheme
+                        .typography
+                        .displayMedium,
                 color =
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme
+                        .colorScheme
+                        .primary
             )
 
             Spacer(
-                modifier = Modifier.height(8.dp)
+                modifier =
+                    Modifier.height(8.dp)
             )
 
             Text(
                 text = "Mirai",
                 style =
-                    MaterialTheme.typography.headlineMedium
+                    MaterialTheme
+                        .typography
+                        .headlineMedium
             )
 
             Text(
                 text = "Futuro",
                 style =
-                    MaterialTheme.typography.bodyLarge,
+                    MaterialTheme
+                        .typography
+                        .bodyLarge,
                 color =
                     MaterialTheme
                         .colorScheme
@@ -377,18 +444,22 @@ private fun AboutSettingsPage(
             )
 
             Spacer(
-                modifier = Modifier.height(24.dp)
+                modifier =
+                    Modifier.height(24.dp)
             )
 
             Text(
                 text =
                     "Versão ${BuildConfig.VERSION_NAME}",
                 style =
-                    MaterialTheme.typography.bodyLarge
+                    MaterialTheme
+                        .typography
+                        .bodyLarge
             )
 
             Spacer(
-                modifier = Modifier.height(8.dp)
+                modifier =
+                    Modifier.height(8.dp)
             )
 
             Text(
@@ -396,17 +467,22 @@ private fun AboutSettingsPage(
                     "Leitor de mangás desenvolvido para oferecer " +
                             "uma experiência simples, rápida e moderna.",
                 style =
-                    MaterialTheme.typography.bodyMedium
+                    MaterialTheme
+                        .typography
+                        .bodyMedium
             )
 
             Spacer(
-                modifier = Modifier.height(16.dp)
+                modifier =
+                    Modifier.height(16.dp)
             )
 
             Text(
                 text = "Desenvolvido por",
                 style =
-                    MaterialTheme.typography.bodyMedium,
+                    MaterialTheme
+                        .typography
+                        .bodyMedium,
                 color =
                     MaterialTheme
                         .colorScheme
@@ -416,13 +492,18 @@ private fun AboutSettingsPage(
             Text(
                 text = "Andreuws",
                 style =
-                    MaterialTheme.typography.titleLarge,
+                    MaterialTheme
+                        .typography
+                        .titleLarge,
                 color =
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme
+                        .colorScheme
+                        .primary
             )
 
             Spacer(
-                modifier = Modifier.height(28.dp)
+                modifier =
+                    Modifier.height(28.dp)
             )
 
             SettingsActionItem(
@@ -437,7 +518,9 @@ private fun AboutSettingsPage(
                 subtitle =
                     "Comunidade, suporte e sugestões",
                 onClick = {
-                    openDiscord(context)
+                    openDiscord(
+                        context
+                    )
                 }
             )
         }
@@ -454,7 +537,9 @@ private fun openDiscord(
         )
 
     runCatching {
-        context.startActivity(intent)
+        context.startActivity(
+            intent
+        )
     }.onFailure {
         Toast.makeText(
             context,

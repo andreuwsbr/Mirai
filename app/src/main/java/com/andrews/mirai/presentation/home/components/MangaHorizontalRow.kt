@@ -18,6 +18,10 @@ import com.andrews.mirai.presentation.components.MangaCard
 fun MangaHorizontalRow(
     mangas: List<Manga>,
     modifier: Modifier = Modifier,
+    coverModelProvider:
+        (Manga) -> Any? = { manga ->
+        manga.coverUrl
+    },
     onMangaClick: (Manga) -> Unit = {}
 ) {
     BoxWithConstraints(
@@ -25,20 +29,29 @@ fun MangaHorizontalRow(
             .fillMaxWidth()
             .clipToBounds()
     ) {
-        val horizontalPadding = 20.dp
-        val itemSpacing = 12.dp
+        val horizontalPadding =
+            20.dp
+
+        val itemSpacing =
+            12.dp
 
         val cardWidth =
             (maxWidth - 56.dp) / 2.45f
 
         LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(
-                start = horizontalPadding,
-                end = horizontalPadding
-            ),
+            modifier =
+                Modifier.fillMaxWidth(),
+            contentPadding =
+                PaddingValues(
+                    start =
+                        horizontalPadding,
+                    end =
+                        horizontalPadding
+                ),
             horizontalArrangement =
-                Arrangement.spacedBy(itemSpacing)
+                Arrangement.spacedBy(
+                    itemSpacing
+                )
         ) {
             items(
                 items = mangas,
@@ -48,11 +61,18 @@ fun MangaHorizontalRow(
             ) { manga ->
                 MangaCard(
                     manga = manga,
-                    modifier = Modifier.width(
-                        cardWidth
-                    ),
+                    coverModel =
+                        coverModelProvider(
+                            manga
+                        ),
+                    modifier =
+                        Modifier.width(
+                            cardWidth
+                        ),
                     onClick = {
-                        onMangaClick(manga)
+                        onMangaClick(
+                            manga
+                        )
                     }
                 )
             }

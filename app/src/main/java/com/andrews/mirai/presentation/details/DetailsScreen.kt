@@ -460,6 +460,14 @@ fun DetailsScreen(
                 onDownloadClick = {
                     scope.launch {
                         when (downloadStatus) {
+                            DownloadStatus.QUEUED,
+                            DownloadStatus.DOWNLOADING -> {
+                                downloadManager
+                                    .cancelAndDelete(
+                                        downloadRequest
+                                    )
+                            }
+
                             DownloadStatus.FAILED,
                             DownloadStatus.PAUSED -> {
                                 downloadManager.retry(
@@ -467,14 +475,14 @@ fun DetailsScreen(
                                 )
                             }
 
+                            DownloadStatus.COMPLETED -> {
+                                Unit
+                            }
+
                             null -> {
                                 downloadManager.enqueue(
                                     downloadRequest
                                 )
-                            }
-
-                            else -> {
-                                Unit
                             }
                         }
                     }

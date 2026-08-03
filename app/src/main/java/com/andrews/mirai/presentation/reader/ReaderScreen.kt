@@ -1,6 +1,5 @@
 package com.andrews.mirai.presentation.reader
 
-import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -21,39 +20,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.andrews.mirai.data.download.OfflineChapterPages
 import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
-import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageCache
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
 import com.andrews.mirai.presentation.reader.components.ReaderErrorContent
 import com.andrews.mirai.presentation.reader.components.ReaderLoadingContent
-import com.andrews.mirai.presentation.reader.mode.LongStripChapterSection
+import com.andrews.mirai.presentation.reader.logic.ReaderChapterController
+import com.andrews.mirai.presentation.reader.logic.ReaderChapterNavigation
+import com.andrews.mirai.presentation.reader.logic.ReaderChapterPageLoader
+import com.andrews.mirai.presentation.reader.logic.ReaderLongStripMapper
+import com.andrews.mirai.presentation.reader.logic.ReaderPageProvider
+import com.andrews.mirai.presentation.reader.logic.ReaderPreloader
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import com.andrews.mirai.presentation.reader.settings.ReaderBackground
 import com.andrews.mirai.presentation.reader.settings.ReaderMode
 import com.andrews.mirai.presentation.reader.settings.ReaderSettingsSheet
 import com.andrews.mirai.presentation.reader.settings.ReaderSettingsStore
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import com.andrews.mirai.presentation.reader.state.ReaderChapterPagesState
+import com.andrews.mirai.presentation.reader.state.ReaderScreenState
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-private const val IMAGE_LOG_TAG =
-    "MIRAI_IMAGE"
 
 private const val PRELOAD_DISTANCE =
     6
 
 private const val NEXT_CHAPTER_PRELOAD_PAGES =
     2
-
-private data class ChapterPagesState(
-    val pages: List<ReaderPage> = emptyList(),
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null
-)
 
 @Composable
 fun ReaderScreen(
@@ -73,9 +65,10 @@ fun ReaderScreen(
 
     val orderedChapters =
         remember(chapters) {
-            chapters.sortedBy { item ->
-                item.number
-            }
+            ReaderChapterNavigation
+                .orderedChapters(
+                    chapters
+                )
         }
 
     val progressStore =
@@ -106,10 +99,54 @@ fun ReaderScreen(
             )
         }
 
-    val offlineChapterPages =
-        remember(applicationContext) {
-            OfflineChapterPages(
-                applicationContext
+    val pageProvider =
+        remember(
+            applicationContext,
+            sourceId
+        ) {
+            ReaderPageProvider(
+                context = applicationContext,
+                sourceId = sourceId
+            )
+        }
+
+    val chapterPageLoader =
+        remember(pageProvider) {
+            ReaderChapterPageLoader(
+                pageProvider
+            )
+        }
+
+    val screenState =
+        remember(
+            chapter.mangaId
+        ) {
+            ReaderScreenState(
+                initialChapter = chapter,
+                initialPageIndex =
+                    progressStore.getPage(
+                        chapter.id
+                    )
+            )
+        }
+
+    val chapterController =
+        remember(
+            screenState,
+            chapterPageLoader,
+            progressStore
+        ) {
+            ReaderChapterController(
+                screenState = screenState,
+                pageLoader = chapterPageLoader,
+                progressStore = progressStore
+            )
+        }
+
+    val preloader =
+        remember(imageDownloader) {
+            ReaderPreloader(
+                imageDownloader
             )
         }
 
@@ -119,252 +156,28 @@ fun ReaderScreen(
         )
     }
 
-    var activeChapter by remember(
-        chapter.mangaId
-    ) {
-        mutableStateOf(
-            chapter
-        )
-    }
-
-    var chapterStates by remember(
-        chapter.mangaId
-    ) {
-        mutableStateOf<
-                Map<String, ChapterPagesState>
-                >(
-            emptyMap()
-        )
-    }
-
-    var pageByChapter by remember(
-        chapter.mangaId
-    ) {
-        mutableStateOf(
-            mapOf(
-                chapter.id to
-                        progressStore.getPage(
-                            chapter.id
-                        )
-            )
-        )
-    }
-
-    var controlsVisible by remember(
-        chapter.mangaId
-    ) {
-        mutableStateOf(true)
-    }
-
-    var settingsVisible by remember {
-        mutableStateOf(false)
-    }
-
-    var requestedChapterId by remember(
-        chapter.mangaId
-    ) {
-        mutableStateOf<String?>(null)
-    }
-
-    var requestedPage by remember(
-        chapter.mangaId
-    ) {
-        mutableStateOf<Int?>(null)
-    }
-
-    suspend fun loadChapterPages(
-        targetChapter: Chapter
-    ) {
-        val existingState =
-            chapterStates[
-                targetChapter.id
-            ]
-
-        if (
-            existingState?.isLoading == true ||
-            existingState
-                ?.pages
-                ?.isNotEmpty() == true
-        ) {
-            return
-        }
-
-        chapterStates =
-            chapterStates + (
-                    targetChapter.id to
-                            ChapterPagesState(
-                                isLoading = true
-                            )
-                    )
-
-        try {
-            /*
-             * Primeiro procura as páginas permanentes
-             * que foram baixadas para leitura offline.
-             */
-            val offlinePages =
-                withContext(
-                    Dispatchers.IO
-                ) {
-                    offlineChapterPages.getPages(
-                        sourceId = sourceId,
-                        mangaId =
-                            targetChapter.mangaId,
-                        chapterId =
-                            targetChapter.id
-                    )
-                }
-
-            /*
-             * Quando o capítulo está baixado, não
-             * fazemos nenhuma requisição à scan.
-             */
-            val result =
-                if (offlinePages.isNotEmpty()) {
-                    Log.d(
-                        IMAGE_LOG_TAG,
-                        "${targetChapter.name}: " +
-                                "${offlinePages.size} " +
-                                "páginas offline"
-                    )
-
-                    offlinePages
-                } else {
-                    withContext(
-                        Dispatchers.IO
-                    ) {
-                        SourceRepository
-                            .currentSource
-                            .getPages(
-                                chapter =
-                                    targetChapter
-                            )
-                    }
-                }
-
-            chapterStates =
-                chapterStates + (
-                        targetChapter.id to
-                                ChapterPagesState(
-                                    pages = result
-                                )
-                        )
-
-            val savedPage =
-                pageByChapter[
-                    targetChapter.id
-                ]
-                    ?: progressStore.getPage(
-                        targetChapter.id
-                    )
-
-            val safePage =
-                savedPage.coerceIn(
-                    minimumValue = 0,
-                    maximumValue =
-                        result
-                            .lastIndex
-                            .coerceAtLeast(0)
-                )
-
-            pageByChapter =
-                pageByChapter + (
-                        targetChapter.id to
-                                safePage
-                        )
-
-            Log.d(
-                IMAGE_LOG_TAG,
-                "${targetChapter.name}: " +
-                        "${result.size} páginas"
-            )
-        } catch (
-            exception: CancellationException
-        ) {
-            chapterStates =
-                chapterStates -
-                        targetChapter.id
-
-            throw exception
-        } catch (throwable: Throwable) {
-            chapterStates =
-                chapterStates + (
-                        targetChapter.id to
-                                ChapterPagesState(
-                                    errorMessage =
-                                        throwable.message
-                                            ?: "Não foi possível carregar as páginas."
-                                )
-                        )
-
-            Log.e(
-                IMAGE_LOG_TAG,
-                "Erro ao carregar " +
-                        targetChapter.name,
-                throwable
-            )
-        }
-    }
-
-    fun chapterIndex(
-        targetChapter: Chapter
-    ): Int {
-        return orderedChapters
-            .indexOfFirst { item ->
-                item.id ==
-                        targetChapter.id
-            }
-    }
-
-    fun previousOf(
-        targetChapter: Chapter
-    ): Chapter? {
-        val index =
-            chapterIndex(
-                targetChapter
-            )
-
-        return if (index > 0) {
-            orderedChapters.getOrNull(
-                index - 1
-            )
-        } else {
-            null
-        }
-    }
-
-    fun nextOf(
-        targetChapter: Chapter
-    ): Chapter? {
-        val index =
-            chapterIndex(
-                targetChapter
-            )
-
-        return if (index >= 0) {
-            orderedChapters.getOrNull(
-                index + 1
-            )
-        } else {
-            null
-        }
-    }
+    val activeChapter =
+        screenState.activeChapter
 
     val previousChapter =
-        previousOf(
-            activeChapter
-        )
+        ReaderChapterNavigation
+            .previousChapter(
+                chapters = orderedChapters,
+                chapter = activeChapter
+            )
 
     val nextChapter =
-        nextOf(
-            activeChapter
-        )
+        ReaderChapterNavigation
+            .nextChapter(
+                chapters = orderedChapters,
+                chapter = activeChapter
+            )
 
     val activeState =
-        chapterStates[
+        screenState.getChapterState(
             activeChapter.id
-        ]
-            ?: ChapterPagesState(
+        )
+            ?: ReaderChapterPagesState(
                 isLoading = true
             )
 
@@ -372,18 +185,10 @@ fun ReaderScreen(
         activeState.pages
 
     val currentPageIndex =
-        (
-                pageByChapter[
-                    activeChapter.id
-                ] ?: 0
-                )
-            .coerceIn(
-                minimumValue = 0,
-                maximumValue =
-                    activePages
-                        .lastIndex
-                        .coerceAtLeast(0)
-            )
+        screenState.currentPageIndex(
+            chapterId = activeChapter.id,
+            pages = activePages
+        )
 
     val isLongStripMode =
         preferences.mode ==
@@ -391,71 +196,40 @@ fun ReaderScreen(
                 preferences.mode ==
                 ReaderMode.LONG_STRIP_GAPS
 
-    val longStripSections =
+    val longStripState =
         remember(
             orderedChapters,
-            chapterStates,
+            screenState.chapterStates,
             activeChapter
         ) {
-            val knownChapters =
-                if (
-                    orderedChapters.isEmpty()
-                ) {
-                    listOf(
+            ReaderLongStripMapper
+                .createState(
+                    orderedChapters =
+                        orderedChapters,
+                    chapterStates =
+                        screenState.chapterStates,
+                    activeChapter =
                         activeChapter
-                    )
-                } else {
-                    orderedChapters
-                }
-
-            knownChapters.mapNotNull {
-                    item ->
-
-                chapterStates[
-                    item.id
-                ]?.let { state ->
-                    LongStripChapterSection(
-                        chapter = item,
-                        pages =
-                            state.pages,
-                        isLoading =
-                            state.isLoading,
-                        errorMessage =
-                            state.errorMessage
-                    )
-                }
-            }
+                )
         }
-
-    val lastLoadedSectionChapter =
-        longStripSections
-            .lastOrNull()
-            ?.chapter
-
-    val showFinalCompletion =
-        lastLoadedSectionChapter != null &&
-                (
-                        orderedChapters.isEmpty() ||
-                                orderedChapters
-                                    .lastOrNull()
-                                    ?.id ==
-                                lastLoadedSectionChapter.id
-                        )
 
     val backgroundColor =
         when (
             preferences.background
         ) {
-            ReaderBackground.BLACK ->
+            ReaderBackground.BLACK -> {
                 Color.Black
+            }
 
-            ReaderBackground.GRAY ->
+            ReaderBackground.GRAY -> {
                 Color(
                     0xFF444444
                 )
+            }
 
-            ReaderBackground.WHITE ->
+            ReaderBackground.WHITE -> {
                 Color.White
+            }
         }
 
     val foregroundColor =
@@ -476,8 +250,8 @@ fun ReaderScreen(
     )
 
     BackHandler {
-        if (settingsVisible) {
-            settingsVisible = false
+        if (screenState.settingsVisible) {
+            screenState.settingsVisible = false
         } else {
             onBackClick()
         }
@@ -494,29 +268,28 @@ fun ReaderScreen(
     LaunchedEffect(
         activeChapter.id
     ) {
-        loadChapterPages(
-            activeChapter
-        )
+        chapterController
+            .loadChapterPages(
+                activeChapter
+            )
     }
 
     LaunchedEffect(
         activeChapter.id,
         orderedChapters
     ) {
-        previousOf(
-            activeChapter
-        )?.let { previous ->
-            loadChapterPages(
-                previous
-            )
+        previousChapter?.let { chapter ->
+            chapterController
+                .loadChapterPages(
+                    chapter
+                )
         }
 
-        nextOf(
-            activeChapter
-        )?.let { next ->
-            loadChapterPages(
-                next
-            )
+        nextChapter?.let { chapter ->
+            chapterController
+                .loadChapterPages(
+                    chapter
+                )
         }
     }
 
@@ -541,123 +314,33 @@ fun ReaderScreen(
         activePages,
         currentPageIndex,
         nextChapter,
-        chapterStates,
-        imageDownloader
+        screenState.chapterStates,
+        preloader
     ) {
-        if (activePages.isNotEmpty()) {
-            val endIndex =
-                (
-                        currentPageIndex +
-                                PRELOAD_DISTANCE
-                        )
-                    .coerceAtMost(
-                        activePages.lastIndex
-                    )
+        preloader.preloadCurrentPages(
+            pages = activePages,
+            currentPageIndex =
+                currentPageIndex,
+            preloadDistance =
+                PRELOAD_DISTANCE
+        )
 
-            for (
-            index in
-            currentPageIndex..endIndex
-            ) {
-                try {
-                    imageDownloader
-                        .downloadWithInfo(
-                            activePages[
-                                index
-                            ].imageUrl
-                        )
-                } catch (
-                    exception:
-                    CancellationException
-                ) {
-                    throw exception
-                } catch (_: Throwable) {
-                    // Ignora falha no pré-carregamento.
-                }
-            }
-        }
-
-        val nextPages =
+        val nextChapterPages =
             nextChapter
-                ?.let { item ->
-                    chapterStates[
-                        item.id
-                    ]?.pages
+                ?.let { chapter ->
+                    screenState
+                        .getChapterState(
+                            chapter.id
+                        )
+                        ?.pages
                 }
                 .orEmpty()
 
-        nextPages
-            .take(
+        preloader.preloadNextChapter(
+            pages = nextChapterPages,
+            maximumPages =
                 NEXT_CHAPTER_PRELOAD_PAGES
-            )
-            .forEach { page ->
-                try {
-                    imageDownloader
-                        .downloadWithInfo(
-                            page.imageUrl
-                        )
-                } catch (
-                    exception:
-                    CancellationException
-                ) {
-                    throw exception
-                } catch (_: Throwable) {
-                    // Ignora falha no pré-carregamento.
-                }
-            }
-    }
-
-    fun openChapterFromControls(
-        targetChapter: Chapter,
-        targetPage: Int
-    ) {
-        coroutineScope.launch {
-            loadChapterPages(
-                targetChapter
-            )
-
-            val pages =
-                chapterStates[
-                    targetChapter.id
-                ]
-                    ?.pages
-                    .orEmpty()
-
-            val safeTargetPage =
-                targetPage.coerceIn(
-                    minimumValue = 0,
-                    maximumValue =
-                        pages
-                            .lastIndex
-                            .coerceAtLeast(0)
-                )
-
-            pageByChapter =
-                pageByChapter + (
-                        targetChapter.id to
-                                safeTargetPage
-                        )
-
-            if (isLongStripMode) {
-                requestedChapterId =
-                    targetChapter.id
-
-                requestedPage =
-                    safeTargetPage
-            } else {
-                activeChapter =
-                    targetChapter
-
-                requestedChapterId =
-                    targetChapter.id
-
-                requestedPage =
-                    safeTargetPage
-
-                onChapterSelected(
-                    targetChapter
-                )
-            }
-        }
+        )
     }
 
     Box(
@@ -711,20 +394,21 @@ fun ReaderScreen(
                     pages =
                         activePages,
                     longStripSections =
-                        longStripSections,
+                        longStripState.sections,
                     mode =
                         preferences.mode,
                     longStripGapDp =
-                        preferences
-                            .longStripGapDp,
+                        preferences.longStripGapDp,
                     initialPage =
                         currentPageIndex,
                     requestedChapterId =
-                        requestedChapterId,
+                        screenState
+                            .requestedChapterId,
                     requestedPage =
-                        requestedPage,
+                        screenState.requestedPage,
                     showFinalCompletion =
-                        showFinalCompletion,
+                        longStripState
+                            .showFinalCompletion,
                     imageDownloader =
                         imageDownloader,
                     backgroundColor =
@@ -733,27 +417,34 @@ fun ReaderScreen(
                             visibleChapter,
                             pageIndex ->
 
-                        pageByChapter =
-                            pageByChapter + (
-                                    visibleChapter.id to
-                                            pageIndex
-                                    )
+                        screenState.updatePage(
+                            chapterId =
+                                visibleChapter.id,
+                            pageIndex =
+                                pageIndex
+                        )
 
                         if (
                             visibleChapter.id !=
-                            activeChapter.id
+                            screenState
+                                .activeChapter
+                                .id
                         ) {
                             if (
                                 visibleChapter.number >
-                                activeChapter.number
+                                screenState
+                                    .activeChapter
+                                    .number
                             ) {
                                 progressStore
                                     .markViewed(
-                                        activeChapter.id
+                                        screenState
+                                            .activeChapter
+                                            .id
                                     )
                             }
 
-                            activeChapter =
+                            screenState.activeChapter =
                                 visibleChapter
 
                             onChapterSelected(
@@ -762,15 +453,11 @@ fun ReaderScreen(
                         }
                     },
                     onRequestedPageConsumed = {
-                        requestedChapterId =
-                            null
-
-                        requestedPage =
-                            null
+                        screenState
+                            .consumeRequestedPage()
                     },
                     onTap = {
-                        controlsVisible =
-                            !controlsVisible
+                        screenState.toggleControls()
                     }
                 )
             }
@@ -778,9 +465,9 @@ fun ReaderScreen(
 
         ReaderControls(
             controlsVisible =
-                controlsVisible,
+                screenState.controlsVisible,
             settingsVisible =
-                settingsVisible,
+                screenState.settingsVisible,
             pagesAvailable =
                 activePages.isNotEmpty(),
             chapterName =
@@ -797,55 +484,70 @@ fun ReaderScreen(
                 nextChapter != null,
             onBackClick =
                 onBackClick,
-            onPageSelected = {
-                    pageIndex ->
-
-                requestedChapterId =
-                    activeChapter.id
-
-                requestedPage =
-                    pageIndex
+            onPageSelected = { pageIndex ->
+                screenState.requestPage(
+                    chapterId =
+                        activeChapter.id,
+                    pageIndex =
+                        pageIndex
+                )
             },
             onPreviousChapterClick = {
-                previousChapter
-                    ?.let { targetChapter ->
-                        openChapterFromControls(
-                            targetChapter =
-                                targetChapter,
-                            targetPage =
-                                progressStore
-                                    .getPage(
-                                        targetChapter.id
-                                    )
-                        )
+                previousChapter?.let {
+                        targetChapter ->
+
+                    coroutineScope.launch {
+                        chapterController
+                            .openChapterFromControls(
+                                targetChapter =
+                                    targetChapter,
+                                targetPage =
+                                    progressStore
+                                        .getPage(
+                                            targetChapter.id
+                                        ),
+                                isLongStripMode =
+                                    isLongStripMode,
+                                onChapterSelected =
+                                    onChapterSelected
+                            )
                     }
+                }
             },
             onNextChapterClick = {
-                nextChapter
-                    ?.let { targetChapter ->
-                        progressStore
-                            .markViewed(
-                                activeChapter.id
-                            )
+                nextChapter?.let {
+                        targetChapter ->
 
-                        openChapterFromControls(
-                            targetChapter =
-                                targetChapter,
-                            targetPage =
-                                progressStore
-                                    .getPage(
-                                        targetChapter.id
-                                    )
-                        )
+                    progressStore.markViewed(
+                        activeChapter.id
+                    )
+
+                    coroutineScope.launch {
+                        chapterController
+                            .openChapterFromControls(
+                                targetChapter =
+                                    targetChapter,
+                                targetPage =
+                                    progressStore
+                                        .getPage(
+                                            targetChapter.id
+                                        ),
+                                isLongStripMode =
+                                    isLongStripMode,
+                                onChapterSelected =
+                                    onChapterSelected
+                            )
                     }
+                }
             },
             onSettingsClick = {
-                settingsVisible = true
+                screenState.settingsVisible =
+                    true
             }
         )
     }
 
-    if (settingsVisible) {
+    if (screenState.settingsVisible) {
         ReaderSettingsSheet(
             preferences =
                 preferences,
@@ -856,7 +558,8 @@ fun ReaderScreen(
                     newPreferences
             },
             onDismiss = {
-                settingsVisible = false
+                screenState.settingsVisible =
+                    false
             }
         )
     }

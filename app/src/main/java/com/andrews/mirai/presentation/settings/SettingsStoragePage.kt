@@ -4,34 +4,57 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.andrews.mirai.data.download.DownloadRepository
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import java.io.File
 import java.util.Locale
 
 @Composable
 internal fun StorageSettingsPage(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onManageDownloadsClick: () -> Unit
 ) {
     val context =
         LocalContext.current.applicationContext
 
-    val progressStore = remember(context) {
-        ReadingProgressStore(context)
-    }
+    val progressStore =
+        remember(context) {
+            ReadingProgressStore(
+                context
+            )
+        }
+
+    val downloadRepository =
+        remember(context) {
+            DownloadRepository(
+                context
+            )
+        }
+
+    val downloadsSizeBytes by
+    downloadRepository
+        .observeTotalSizeBytes()
+        .collectAsStateWithLifecycle(
+            initialValue = 0L
+        )
 
     var cacheSize by remember {
         mutableStateOf(
-            calculateCacheSize(context)
+            calculateCacheSize(
+                context
+            )
         )
     }
 
@@ -47,33 +70,63 @@ internal fun StorageSettingsPage(
         title = "Armazenamento",
         onBackClick = onBackClick
     ) {
-        SettingsSectionTitle("Cache")
+        SettingsSectionTitle(
+            title = "Downloads"
+        )
 
         SettingsActionItem(
             icon = {
                 Icon(
-                    imageVector = Icons.Outlined.DeleteOutline,
+                    imageVector =
+                        Icons.Outlined.DownloadDone,
+                    contentDescription = null
+                )
+            },
+            title = "Gerenciar downloads",
+            subtitle =
+                "Espaço utilizado: ${
+                    formatBytes(downloadsSizeBytes)
+                }",
+            onClick =
+                onManageDownloadsClick
+        )
+
+        SettingsSectionTitle(
+            title = "Cache"
+        )
+
+        SettingsActionItem(
+            icon = {
+                Icon(
+                    imageVector =
+                        Icons.Outlined.DeleteOutline,
                     contentDescription = null
                 )
             },
             title = "Limpar cache",
-            subtitle = "Espaço utilizado: $cacheSize",
+            subtitle =
+                "Espaço utilizado: $cacheSize",
             onClick = {
                 showCacheDialog = true
             }
         )
 
-        SettingsSectionTitle("Histórico")
+        SettingsSectionTitle(
+            title = "Histórico"
+        )
 
         SettingsActionItem(
             icon = {
                 Icon(
-                    imageVector = Icons.Outlined.DeleteOutline,
+                    imageVector =
+                        Icons.Outlined.DeleteOutline,
                     contentDescription = null
                 )
             },
-            title = "Limpar histórico de leitura",
-            subtitle = "Remove a lista de capítulos acessados",
+            title =
+                "Limpar histórico de leitura",
+            subtitle =
+                "Remove a lista de capítulos acessados",
             onClick = {
                 showHistoryDialog = true
             }
@@ -86,23 +139,32 @@ internal fun StorageSettingsPage(
                 showCacheDialog = false
             },
             title = {
-                Text("Limpar cache?")
+                Text(
+                    text = "Limpar cache?"
+                )
             },
             text = {
                 Text(
-                    "As imagens temporárias serão removidas. " +
-                            "Seus favoritos e seu histórico não serão apagados."
+                    text =
+                        "As imagens temporárias serão removidas. " +
+                                "Os capítulos baixados, favoritos e " +
+                                "histórico não serão apagados."
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        clearApplicationCache(context)
+                        clearApplicationCache(
+                            context
+                        )
 
                         cacheSize =
-                            calculateCacheSize(context)
+                            calculateCacheSize(
+                                context
+                            )
 
-                        showCacheDialog = false
+                        showCacheDialog =
+                            false
 
                         Toast.makeText(
                             context,
@@ -111,16 +173,21 @@ internal fun StorageSettingsPage(
                         ).show()
                     }
                 ) {
-                    Text("Limpar")
+                    Text(
+                        text = "Limpar"
+                    )
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = {
-                        showCacheDialog = false
+                        showCacheDialog =
+                            false
                     }
                 ) {
-                    Text("Cancelar")
+                    Text(
+                        text = "Cancelar"
+                    )
                 }
             }
         )
@@ -132,20 +199,25 @@ internal fun StorageSettingsPage(
                 showHistoryDialog = false
             },
             title = {
-                Text("Limpar histórico?")
+                Text(
+                    text = "Limpar histórico?"
+                )
             },
             text = {
                 Text(
-                    "A lista de leituras recentes será removida. " +
-                            "Os favoritos não serão afetados."
+                    text =
+                        "A lista de leituras recentes será removida. " +
+                                "Os favoritos e downloads não serão afetados."
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        progressStore.clearHistory()
+                        progressStore
+                            .clearHistory()
 
-                        showHistoryDialog = false
+                        showHistoryDialog =
+                            false
 
                         Toast.makeText(
                             context,
@@ -154,16 +226,21 @@ internal fun StorageSettingsPage(
                         ).show()
                     }
                 ) {
-                    Text("Limpar")
+                    Text(
+                        text = "Limpar"
+                    )
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = {
-                        showHistoryDialog = false
+                        showHistoryDialog =
+                            false
                     }
                 ) {
-                    Text("Cancelar")
+                    Text(
+                        text = "Cancelar"
+                    )
                 }
             }
         )
@@ -174,14 +251,19 @@ private fun calculateCacheSize(
     context: Context
 ): String {
     return formatBytes(
-        directorySize(context.cacheDir)
+        directorySize(
+            context.cacheDir
+        )
     )
 }
 
 private fun directorySize(
     file: File?
 ): Long {
-    if (file == null || !file.exists()) {
+    if (
+        file == null ||
+        !file.exists()
+    ) {
         return 0L
     }
 
@@ -189,9 +271,12 @@ private fun directorySize(
         return file.length()
     }
 
-    return file.listFiles()
+    return file
+        .listFiles()
         ?.sumOf { child ->
-            directorySize(child)
+            directorySize(
+                child
+            )
         }
         ?: 0L
 }
@@ -215,15 +300,19 @@ private fun formatBytes(
         return "0 B"
     }
 
-    val units = listOf(
-        "B",
-        "KB",
-        "MB",
-        "GB"
-    )
+    val units =
+        listOf(
+            "B",
+            "KB",
+            "MB",
+            "GB"
+        )
 
-    var value = bytes.toDouble()
-    var unitIndex = 0
+    var value =
+        bytes.toDouble()
+
+    var unitIndex =
+        0
 
     while (
         value >= 1024.0 &&
