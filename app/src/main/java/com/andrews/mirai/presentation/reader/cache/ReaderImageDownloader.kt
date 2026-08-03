@@ -1,6 +1,7 @@
 package com.andrews.mirai.presentation.reader.cache
 
 import android.graphics.BitmapFactory
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -24,25 +25,44 @@ class ReaderImageDownloader(
     suspend fun download(
         imageUrl: String
     ): File = withContext(Dispatchers.IO) {
-        val downloadLock = downloadLocks.getOrPut(
-            imageUrl
-        ) {
-            Mutex()
+        val localFile =
+            getLocalFileOrNull(
+                imageUrl
+            )
+
+        if (localFile != null) {
+            return@withContext localFile
         }
 
+        val downloadLock =
+            downloadLocks.getOrPut(
+                imageUrl
+            ) {
+                Mutex()
+            }
+
         downloadLock.withLock {
-            downloadImageIfNecessary(imageUrl)
+            downloadImageIfNecessary(
+                imageUrl
+            )
         }
     }
 
     suspend fun downloadWithInfo(
         imageUrl: String
     ): DownloadedReaderImage {
-        val file = download(imageUrl)
+        val file =
+            download(
+                imageUrl
+            )
 
-        val aspectRatio = aspectRatioCache
-            .getOrPut(imageUrl) {
-                readAspectRatio(file)
+        val aspectRatio =
+            aspectRatioCache.getOrPut(
+                imageUrl
+            ) {
+                readAspectRatio(
+                    file
+                )
             }
 
         return DownloadedReaderImage(
@@ -54,13 +74,54 @@ class ReaderImageDownloader(
     fun getCachedAspectRatio(
         imageUrl: String
     ): Float? {
-        return aspectRatioCache[imageUrl]
+        return aspectRatioCache[
+            imageUrl
+        ]
+    }
+
+    private fun getLocalFileOrNull(
+        imageUrl: String
+    ): File? {
+        val uri =
+            Uri.parse(
+                imageUrl
+            )
+
+        if (uri.scheme != FILE_SCHEME) {
+            return null
+        }
+
+        val localPath =
+            uri.path
+                ?: throw IOException(
+                    "O caminho da página offline é inválido."
+                )
+
+        val localFile =
+            File(
+                localPath
+            )
+
+        if (
+            !localFile.exists() ||
+            !localFile.isFile ||
+            localFile.length() <= 0L
+        ) {
+            throw IOException(
+                "A página offline não foi encontrada."
+            )
+        }
+
+        return localFile
     }
 
     private fun downloadImageIfNecessary(
         imageUrl: String
     ): File {
-        val cachedFile = imageCache.getImageFile(imageUrl)
+        val cachedFile =
+            imageCache.getImageFile(
+                imageUrl
+            )
 
         if (
             cachedFile.exists() &&
@@ -69,26 +130,30 @@ class ReaderImageDownloader(
             return cachedFile
         }
 
-        val temporaryFile = File(
-            cachedFile.parentFile,
-            "${cachedFile.name}.temporary"
-        )
+        val temporaryFile =
+            File(
+                cachedFile.parentFile,
+                "${cachedFile.name}.temporary"
+            )
 
         temporaryFile.delete()
 
-        val request = Request.Builder()
-            .url(imageUrl)
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Linux; Android 14) " +
-                        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                        "Chrome/120.0.0.0 Mobile Safari/537.36"
-            )
-            .build()
+        val request =
+            Request.Builder()
+                .url(
+                    imageUrl
+                )
+                .header(
+                    "User-Agent",
+                    USER_AGENT
+                )
+                .build()
 
         try {
             httpClient
-                .newCall(request)
+                .newCall(
+                    request
+                )
                 .execute()
                 .use { response ->
                     if (!response.isSuccessful) {
@@ -97,19 +162,29 @@ class ReaderImageDownloader(
                         )
                     }
 
-                    val responseBody = response.body
-                        ?: throw IOException(
-                            "O servidor retornou uma imagem vazia."
-                        )
+                    val responseBody =
+                        response.body
+                            ?: throw IOException(
+                                "O servidor retornou uma imagem vazia."
+                            )
 
-                    responseBody.byteStream().use { inputStream ->
-                        temporaryFile.outputStream().use { outputStream ->
-                            inputStream.copyTo(outputStream)
+                    responseBody
+                        .byteStream()
+                        .use { inputStream ->
+                            temporaryFile
+                                .outputStream()
+                                .use { outputStream ->
+                                    inputStream.copyTo(
+                                        outputStream
+                                    )
+                                }
                         }
-                    }
                 }
 
-            if (temporaryFile.length() <= 0L) {
+            if (
+                !temporaryFile.exists() ||
+                temporaryFile.length() <= 0L
+            ) {
                 throw IOException(
                     "O arquivo baixado está vazio."
                 )
@@ -120,7 +195,9 @@ class ReaderImageDownloader(
             }
 
             val renamedSuccessfully =
-                temporaryFile.renameTo(cachedFile)
+                temporaryFile.renameTo(
+                    cachedFile
+                )
 
             if (!renamedSuccessfully) {
                 temporaryFile.copyTo(
@@ -144,7 +221,10 @@ class ReaderImageDownloader(
         } catch (exception: Exception) {
             temporaryFile.delete()
 
-            if (cachedFile.length() <= 0L) {
+            if (
+                cachedFile.exists() &&
+                cachedFile.length() <= 0L
+            ) {
                 cachedFile.delete()
             }
 
@@ -155,9 +235,10 @@ class ReaderImageDownloader(
     private fun readAspectRatio(
         file: File
     ): Float {
-        val options = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
+        val options =
+            BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
 
         BitmapFactory.decodeFile(
             file.absolutePath,
@@ -178,6 +259,15 @@ class ReaderImageDownloader(
     }
 
     private companion object {
+
+        const val FILE_SCHEME =
+            "file"
+
+        const val USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 14) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                    "Chrome/120.0.0.0 Mobile Safari/537.36"
+
         val downloadLocks =
             ConcurrentHashMap<String, Mutex>()
 

@@ -45,7 +45,7 @@ class AstralToonsSource : MangaSource {
         get() = "astraltoons"
 
     override val name: String
-        get() = "AstralToons"
+        get() = "AstraToons"
 
     override val baseUrl: String
         get() = AstralToonsUrls.BASE_URL

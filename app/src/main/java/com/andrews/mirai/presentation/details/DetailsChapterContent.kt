@@ -1,20 +1,32 @@
 package com.andrews.mirai.presentation.details
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
+import com.andrews.mirai.data.local.download.DownloadStatus
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.presentation.details.components.ChapterListControls
 
@@ -147,14 +159,17 @@ internal fun DetailsChapterContent(
 internal fun ChapterItem(
     chapter: Chapter,
     isViewed: Boolean,
-    onClick: () -> Unit
+    downloadStatus: DownloadStatus?,
+    downloadProgress: Int,
+    onClick: () -> Unit,
+    onDownloadClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(
                 if (isViewed) {
-                    0.55f
+                    0.70f
                 } else {
                     1f
                 }
@@ -169,50 +184,204 @@ internal fun ChapterItem(
         shape = RoundedCornerShape(14.dp),
         tonalElevation = 2.dp
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 16.dp,
+                    top = 12.dp,
+                    end = 8.dp,
+                    bottom = 12.dp
+                ),
+            verticalAlignment =
+                Alignment.CenterVertically,
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = chapter.name,
-                style =
-                    MaterialTheme
-                        .typography
-                        .titleMedium
-            )
-
-            if (chapter.uploadedAt.isNotBlank()) {
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
-
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    text = chapter.uploadedAt,
+                    text = chapter.name,
                     style =
                         MaterialTheme
                             .typography
-                            .bodySmall,
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .onSurfaceVariant
+                            .titleMedium
+                )
+
+                if (chapter.uploadedAt.isNotBlank()) {
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        text = chapter.uploadedAt,
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .onSurfaceVariant
+                    )
+                }
+
+                if (isViewed) {
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+
+                    Text(
+                        text = "Visto",
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelMedium,
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .primary
+                    )
+                }
+
+                DownloadStatusText(
+                    status = downloadStatus,
+                    progress = downloadProgress
                 )
             }
 
-            if (isViewed) {
-                Spacer(
-                    modifier = Modifier.height(6.dp)
-                )
+            ChapterDownloadButton(
+                status = downloadStatus,
+                onClick = onDownloadClick
+            )
+        }
+    }
+}
 
-                Text(
-                    text = "Visto",
-                    style =
+@Composable
+private fun DownloadStatusText(
+    status: DownloadStatus?,
+    progress: Int
+) {
+    val text =
+        when (status) {
+            DownloadStatus.QUEUED ->
+                "Aguardando download"
+
+            DownloadStatus.DOWNLOADING ->
+                "Baixando: ${progress.coerceIn(0, 100)}%"
+
+            DownloadStatus.COMPLETED ->
+                "Disponível offline"
+
+            DownloadStatus.FAILED ->
+                "Falha no download"
+
+            DownloadStatus.PAUSED ->
+                "Download pausado"
+
+            null ->
+                null
+        }
+
+    if (text != null) {
+        Spacer(
+            modifier = Modifier.height(6.dp)
+        )
+
+        Text(
+            text = text,
+            style =
+                MaterialTheme
+                    .typography
+                    .labelMedium,
+            color =
+                when (status) {
+                    DownloadStatus.FAILED ->
                         MaterialTheme
-                            .typography
-                            .labelMedium,
-                    color =
+                            .colorScheme
+                            .error
+
+                    else ->
                         MaterialTheme
                             .colorScheme
                             .primary
+                }
+        )
+    }
+}
+
+@Composable
+private fun ChapterDownloadButton(
+    status: DownloadStatus?,
+    onClick: () -> Unit
+) {
+    val enabled =
+        status == null ||
+                status == DownloadStatus.FAILED ||
+                status == DownloadStatus.PAUSED
+
+    IconButton(
+        onClick = onClick,
+        enabled = enabled
+    ) {
+        when (status) {
+            DownloadStatus.QUEUED -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+
+            DownloadStatus.DOWNLOADING -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+
+            DownloadStatus.COMPLETED -> {
+                Icon(
+                    imageVector =
+                        Icons.Outlined.CheckCircle,
+                    contentDescription =
+                        "Capítulo disponível offline",
+                    tint =
+                        MaterialTheme
+                            .colorScheme
+                            .primary
+                )
+            }
+
+            DownloadStatus.FAILED -> {
+                Icon(
+                    imageVector =
+                        Icons.Outlined.ErrorOutline,
+                    contentDescription =
+                        "Tentar baixar novamente",
+                    tint =
+                        MaterialTheme
+                            .colorScheme
+                            .error
+                )
+            }
+
+            DownloadStatus.PAUSED -> {
+                Icon(
+                    imageVector =
+                        Icons.Outlined.PauseCircleOutline,
+                    contentDescription =
+                        "Continuar download"
+                )
+            }
+
+            null -> {
+                Icon(
+                    imageVector =
+                        Icons.Outlined.Download,
+                    contentDescription =
+                        "Baixar capítulo"
                 )
             }
         }

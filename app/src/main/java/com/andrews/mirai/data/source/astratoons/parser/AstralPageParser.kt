@@ -12,18 +12,26 @@ class AstralPageParser(
     fun parse(
         html: String
     ): List<ReaderPage> {
-        val document = Jsoup.parse(
-            html,
-            baseUrl
-        )
+        val document =
+            Jsoup.parse(
+                html,
+                baseUrl
+            )
 
+        /*
+         * LinkedHashSet mantém a ordem em que as imagens
+         * aparecem no site e também remove duplicadas.
+         */
         val imageUrls =
             linkedSetOf<String>()
 
+        /*
+         * Primeiro coletamos as imagens diretamente dos
+         * elementos HTML, preservando a ordem visual do capítulo.
+         */
         document
             .select(
-                AstralToonsSelectors
-                    .PAGE_IMAGE
+                AstralToonsSelectors.PAGE_IMAGE
             )
             .forEach { image ->
                 val rawUrl =
@@ -44,25 +52,25 @@ class AstralPageParser(
                             )
                         }
 
-                if (!rawUrl.isNullOrBlank()) {
-                    resolveUrl(rawUrl)
-                        ?.let(imageUrls::add)
-                }
+                resolveUrl(rawUrl)
+                    ?.let(imageUrls::add)
             }
 
+        /*
+         * Algumas páginas podem estar dentro de scripts.
+         * Essas URLs são adicionadas apenas quando ainda
+         * não foram encontradas no HTML.
+         */
         extractUrlsFromHtml(html)
+            .mapNotNull(::resolveUrl)
             .forEach(imageUrls::add)
 
+        /*
+         * Não ordenamos pelo nome do arquivo.
+         * A ordem correta é a ordem entregue pelo site.
+         */
         return imageUrls
-            .sortedWith(
-                compareBy(
-                    ::extractPageNumber
-                )
-            )
-            .mapIndexed {
-                    index,
-                    imageUrl ->
-
+            .mapIndexed { index, imageUrl ->
                 ReaderPage(
                     index = index,
                     imageUrl = imageUrl
@@ -89,15 +97,17 @@ class AstralPageParser(
     }
 
     private fun resolveUrl(
-        value: String
+        value: String?
     ): String? {
-        val normalizedValue = value
-            .trim()
-            .replace("\\/", "/")
-            .replace(
-                "\\u0026",
-                "&"
-            )
+        val normalizedValue =
+            value
+                ?.trim()
+                ?.replace("\\/", "/")
+                ?.replace(
+                    "\\u0026",
+                    "&"
+                )
+                .orEmpty()
 
         if (
             normalizedValue.isBlank() ||
@@ -114,20 +124,5 @@ class AstralPageParser(
                 .resolve(normalizedValue)
                 .toString()
         }.getOrNull()
-    }
-
-    private fun extractPageNumber(
-        imageUrl: String
-    ): Int {
-        val fileName = imageUrl
-            .substringBefore("?")
-            .substringAfterLast("/")
-
-        return AstralToonsSelectors
-            .PAGE_NUMBER
-            .find(fileName)
-            ?.value
-            ?.toIntOrNull()
-            ?: Int.MAX_VALUE
     }
 }

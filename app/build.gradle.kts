@@ -38,6 +38,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -48,8 +49,8 @@ android {
         applicationId = "com.andrews.mirai"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         buildConfigField(
             type = "String",
@@ -111,6 +112,21 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(
         libs.androidx.lifecycle.runtime.ktx
+    )
+    implementation(
+        libs.androidx.room.runtime
+    )
+
+    implementation(
+        libs.androidx.room.ktx
+    )
+
+    ksp(
+        libs.androidx.room.compiler
+    )
+
+    implementation(
+        libs.androidx.work.runtime.ktx
     )
     implementation(
         libs.androidx.activity.compose
