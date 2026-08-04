@@ -3,7 +3,9 @@ package com.andrews.mirai.presentation.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -33,19 +35,31 @@ import com.andrews.mirai.presentation.components.resolveMangaCoverModel
 import com.andrews.mirai.presentation.home.components.ContinueReadingCard
 import com.andrews.mirai.presentation.home.components.HomeSearchBar
 import com.andrews.mirai.presentation.home.components.HomeSection
+import com.andrews.mirai.presentation.home.components.HomeSectionHeader
+import com.andrews.mirai.presentation.home.components.HomeSourceSelector
 import com.andrews.mirai.presentation.home.components.MangaHorizontalRow
+import com.andrews.mirai.presentation.home.components.RecentHistorySection
+import com.andrews.mirai.presentation.reader.progress.ReadingHistoryItem
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val RECENT_HISTORY_LIMIT =
+    10
+
 @Composable
 fun HomeScreen(
     onMangaClick: (Manga) -> Unit = {},
+    onSavedMangaClick: (
+        manga: Manga,
+        sourceId: String
+    ) -> Unit = { _, _ -> },
     onContinueReadingClick: (
         chapter: Chapter,
         sourceId: String
-    ) -> Unit = { _, _ -> }
+    ) -> Unit = { _, _ -> },
+    onOpenHistoryClick: () -> Unit = {}
 ) {
     val applicationContext =
         LocalContext
@@ -76,8 +90,24 @@ fun HomeScreen(
     val listState =
         rememberLazyListState()
 
+    var selectedSourceId by
+    rememberSaveable {
+        mutableStateOf(
+            SourceRepository
+                .currentSource
+                .id
+        )
+    }
+
     val source =
-        SourceRepository.currentSource
+        SourceRepository
+            .sources
+            .firstOrNull { sourceItem ->
+                sourceItem.id ==
+                        selectedSourceId
+            }
+            ?: SourceRepository
+                .currentSource
 
     var query by rememberSaveable {
         mutableStateOf("")
@@ -88,13 +118,15 @@ fun HomeScreen(
         mutableStateOf(false)
     }
 
-    var mangas by remember(source.id) {
+    var mangas by
+    remember(source.id) {
         mutableStateOf<List<Manga>>(
             emptyList()
         )
     }
 
-    var loading by remember(source.id) {
+    var loading by
+    remember(source.id) {
         mutableStateOf(true)
     }
 
@@ -109,12 +141,20 @@ fun HomeScreen(
         mutableIntStateOf(0)
     }
 
-    val lastReading =
+    val history =
         progressStore
             .getHistory()
-            .maxByOrNull { item ->
+            .sortedByDescending { item ->
                 item.readAt
             }
+
+    val lastReading =
+        history.firstOrNull()
+
+    val recentHistory =
+        history.take(
+            RECENT_HISTORY_LIMIT
+        )
 
     val continueReadingCoverModel =
         lastReading?.let { item ->
@@ -210,12 +250,12 @@ fun HomeScreen(
                 bottom = 40.dp
             ),
         verticalArrangement =
-            Arrangement.spacedBy(12.dp)
+            Arrangement.spacedBy(18.dp)
     ) {
         item {
             MiraiHeader(
                 title = "MIRAI",
-                subtitle = source.name
+                subtitle = "未来"
             ) {
                 HomeSearchBar(
                     value = query,
@@ -236,6 +276,33 @@ fun HomeScreen(
             }
         }
 
+        item {
+            HomeSourceSelector(
+                sources =
+                    SourceRepository.sources,
+                selectedSourceId =
+                    source.id,
+                onSourceSelected = {
+                        newSourceId ->
+
+                    val selected =
+                        SourceRepository
+                            .selectSource(
+                                newSourceId
+                            )
+
+                    if (selected) {
+                        selectedSourceId =
+                            newSourceId
+
+                        query = ""
+                        searchExpanded =
+                            false
+                    }
+                }
+            )
+        }
+
         if (lastReading != null) {
             item {
                 ContinueReadingCard(
@@ -245,6 +312,11 @@ fun HomeScreen(
                     chapter =
                         lastReading
                             .chapterName,
+                    sourceName =
+                        sourceNameFor(
+                            lastReading
+                                .sourceId
+                        ),
                     coverModel =
                         continueReadingCoverModel,
                     currentPage =
@@ -253,34 +325,62 @@ fun HomeScreen(
                     totalPages =
                         lastReading
                             .totalPages,
-                    onClick = {
-                        val chapter =
-                            Chapter(
-                                id =
-                                    lastReading
-                                        .chapterId,
-                                mangaId =
-                                    lastReading
-                                        .mangaId,
-                                name =
-                                    lastReading
-                                        .chapterName,
-                                number =
-                                    extractChapterNumber(
-                                        lastReading
-                                            .chapterName
-                                    ),
-                                url =
-                                    lastReading
-                                        .chapterId
-                            )
-
+                    onContinueClick = {
                         onContinueReadingClick(
-                            chapter,
+                            createChapter(
+                                lastReading
+                            ),
+                            lastReading
+                                .sourceId
+                        )
+                    },
+                    onDetailsClick = {
+                        onSavedMangaClick(
+                            createManga(
+                                lastReading
+                            ),
                             lastReading
                                 .sourceId
                         )
                     }
+                )
+            }
+        }
+
+        if (recentHistory.isNotEmpty()) {
+            item {
+                RecentHistorySection(
+                    items =
+                        recentHistory,
+                    coverModelProvider = {
+                            item ->
+                        resolveMangaCoverModel(
+                            sourceId =
+                                item.sourceId,
+                            mangaId =
+                                item.mangaId,
+                            remoteCoverUrl =
+                                item.mangaCoverUrl,
+                            downloadedMangas =
+                                downloadedMangas
+                        )
+                    },
+                    onDetailsClick = {
+                            item ->
+                        onSavedMangaClick(
+                            createManga(item),
+                            item.sourceId
+                        )
+                    },
+                    onContinueClick = {
+                            item ->
+                        onContinueReadingClick(
+                            createChapter(item),
+                            item.sourceId
+                        )
+                    },
+                    onViewAllClick =
+                        onOpenHistoryClick
                 )
             }
         }
@@ -300,13 +400,14 @@ fun HomeScreen(
                     ) {
                         CircularProgressIndicator()
 
+                        Spacer(
+                            modifier =
+                                Modifier.height(12.dp)
+                        )
+
                         Text(
                             text =
-                                "Carregando ${source.name}...",
-                            modifier =
-                                Modifier.padding(
-                                    top = 12.dp
-                                )
+                                "Carregando ${source.name}..."
                         )
                     }
                 }
@@ -358,7 +459,8 @@ fun HomeScreen(
                             "Nenhuma obra encontrada para \"$normalizedQuery\".",
                         modifier =
                             Modifier.padding(
-                                20.dp
+                                horizontal = 20.dp,
+                                vertical = 12.dp
                             )
                     )
                 }
@@ -370,10 +472,40 @@ fun HomeScreen(
                         .isNotEmpty()
                 ) {
                     item {
-                        HomeSection(
-                            title =
-                                "Destaques"
+                        if (
+                            normalizedQuery
+                                .isBlank()
                         ) {
+                            HomeSection(
+                                title =
+                                    "Destaques da ${source.name}"
+                            ) {
+                                MangaHorizontalRow(
+                                    mangas =
+                                        featuredMangas,
+                                    coverModelProvider = {
+                                            manga ->
+                                        resolveMangaCoverModel(
+                                            sourceId =
+                                                source.id,
+                                            mangaId =
+                                                manga.id,
+                                            remoteCoverUrl =
+                                                manga.coverUrl,
+                                            downloadedMangas =
+                                                downloadedMangas
+                                        )
+                                    },
+                                    onMangaClick =
+                                        onMangaClick
+                                )
+                            }
+                        } else {
+                            HomeSectionHeader(
+                                title =
+                                    "Resultados da pesquisa"
+                            )
+
                             MangaHorizontalRow(
                                 mangas =
                                     featuredMangas,
@@ -398,8 +530,8 @@ fun HomeScreen(
                 }
 
                 if (
-                    exploreMangas
-                        .isNotEmpty()
+                    normalizedQuery.isBlank() &&
+                    exploreMangas.isNotEmpty()
                 ) {
                     item {
                         HomeSection(
@@ -431,6 +563,44 @@ fun HomeScreen(
             }
         }
     }
+}
+
+private fun createManga(
+    item: ReadingHistoryItem
+): Manga {
+    return Manga(
+        id = item.mangaId,
+        title = item.mangaTitle,
+        description = "",
+        coverUrl = item.mangaCoverUrl
+    )
+}
+
+private fun createChapter(
+    item: ReadingHistoryItem
+): Chapter {
+    return Chapter(
+        id = item.chapterId,
+        mangaId = item.mangaId,
+        name = item.chapterName,
+        number =
+            extractChapterNumber(
+                item.chapterName
+            ),
+        url = item.chapterId
+    )
+}
+
+private fun sourceNameFor(
+    sourceId: String
+): String {
+    return SourceRepository
+        .sources
+        .firstOrNull { source ->
+            source.id == sourceId
+        }
+        ?.name
+        ?: "Fonte salva"
 }
 
 private fun extractChapterNumber(

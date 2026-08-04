@@ -1,6 +1,5 @@
 package com.andrews.mirai.presentation.home.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,17 +9,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.andrews.mirai.presentation.components.createMiraiImageModel
@@ -29,10 +35,12 @@ import com.andrews.mirai.presentation.components.createMiraiImageModel
 fun ContinueReadingCard(
     title: String,
     chapter: String,
+    sourceName: String,
     coverModel: Any?,
     currentPage: Int,
     totalPages: Int,
-    onClick: () -> Unit
+    onContinueClick: () -> Unit,
+    onDetailsClick: () -> Unit
 ) {
     val context =
         LocalContext.current
@@ -43,10 +51,20 @@ fun ContinueReadingCard(
             model = coverModel
         )
 
+    val safeCurrentPage =
+        if (totalPages > 0) {
+            currentPage.coerceIn(
+                minimumValue = 1,
+                maximumValue = totalPages
+            )
+        } else {
+            currentPage.coerceAtLeast(1)
+        }
+
     val progress =
         if (totalPages > 0) {
             (
-                    currentPage.toFloat() /
+                    safeCurrentPage.toFloat() /
                             totalPages.toFloat()
                     ).coerceIn(
                     minimumValue = 0f,
@@ -61,20 +79,24 @@ fun ContinueReadingCard(
             .fillMaxWidth()
             .padding(
                 horizontal = 20.dp
-            )
-            .clickable(
-                onClick = onClick
             ),
         shape =
-            RoundedCornerShape(22.dp),
+            RoundedCornerShape(24.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    MaterialTheme
+                        .colorScheme
+                        .surfaceContainerHigh
+            ),
         elevation =
             CardDefaults.cardElevation(
-                defaultElevation = 4.dp
+                defaultElevation = 2.dp
             )
     ) {
         Row(
             modifier =
-                Modifier.padding(18.dp),
+                Modifier.padding(16.dp),
             horizontalArrangement =
                 Arrangement.spacedBy(16.dp)
         ) {
@@ -87,8 +109,8 @@ fun ContinueReadingCard(
                     ContentScale.Crop,
                 modifier = Modifier
                     .size(
-                        width = 74.dp,
-                        height = 108.dp
+                        width = 82.dp,
+                        height = 120.dp
                     )
                     .clip(
                         RoundedCornerShape(
@@ -111,12 +133,14 @@ fun ContinueReadingCard(
                     color =
                         MaterialTheme
                             .colorScheme
-                            .primary
+                            .primary,
+                    fontWeight =
+                        FontWeight.Bold
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(8.dp)
+                        Modifier.height(5.dp)
                 )
 
                 Text(
@@ -124,10 +148,12 @@ fun ContinueReadingCard(
                     style =
                         MaterialTheme
                             .typography
-                            .titleLarge,
+                            .titleMedium,
                     fontWeight =
                         FontWeight.Bold,
-                    maxLines = 2
+                    maxLines = 2,
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
 
                 Spacer(
@@ -144,12 +170,27 @@ fun ContinueReadingCard(
                     color =
                         MaterialTheme
                             .colorScheme
+                            .onSurfaceVariant,
+                    maxLines = 1,
+                    overflow =
+                        TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = sourceName,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelSmall,
+                    color =
+                        MaterialTheme
+                            .colorScheme
                             .onSurfaceVariant
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(14.dp)
+                        Modifier.height(12.dp)
                 )
 
                 LinearProgressIndicator(
@@ -162,20 +203,62 @@ fun ContinueReadingCard(
 
                 Spacer(
                     modifier =
-                        Modifier.height(8.dp)
+                        Modifier.height(6.dp)
                 )
 
                 Text(
                     text =
                         if (totalPages > 0) {
-                            "Página $currentPage de $totalPages"
+                            "Página $safeCurrentPage de $totalPages"
                         } else {
-                            "Página $currentPage"
+                            "Página $safeCurrentPage"
                         },
                     style =
                         MaterialTheme
                             .typography
                             .labelMedium
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 12.dp,
+                    end = 16.dp,
+                    bottom = 14.dp
+                ),
+            horizontalArrangement =
+                Arrangement.SpaceBetween
+        ) {
+            TextButton(
+                onClick =
+                    onDetailsClick
+            ) {
+                Icon(
+                    imageVector =
+                        Icons.Outlined.Info,
+                    contentDescription = null
+                )
+
+                Text(
+                    text = "Detalhes"
+                )
+            }
+
+            Button(
+                onClick =
+                    onContinueClick
+            ) {
+                Icon(
+                    imageVector =
+                        Icons.Outlined.PlayArrow,
+                    contentDescription = null
+                )
+
+                Text(
+                    text = "Continuar"
                 )
             }
         }

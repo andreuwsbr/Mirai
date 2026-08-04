@@ -419,9 +419,20 @@ fun MiraiApp() {
                                             destination
                                                 .route,
                                 onClick = {
-                                    navController
-                                        .navigate(
-                                            destination
+                                    if (
+                                        currentRoute ==
+                                        destination.route
+                                    ) {
+                                        return@NavigationBarItem
+                                    }
+
+                                    if (
+                                        destination.route ==
+                                        MiraiDestination.Home.route
+                                    ) {
+                                        navController.navigate(
+                                            MiraiDestination
+                                                .Home
                                                 .route
                                         ) {
                                             popUpTo(
@@ -429,16 +440,29 @@ fun MiraiApp() {
                                                     .Home
                                                     .route
                                             ) {
-                                                saveState =
-                                                    true
+                                                inclusive = false
+                                                saveState = false
                                             }
 
-                                            launchSingleTop =
-                                                true
-
-                                            restoreState =
-                                                true
+                                            launchSingleTop = true
+                                            restoreState = false
                                         }
+                                    } else {
+                                        navController.navigate(
+                                            destination.route
+                                        ) {
+                                            popUpTo(
+                                                MiraiDestination
+                                                    .Home
+                                                    .route
+                                            ) {
+                                                saveState = true
+                                            }
+
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
                                 },
                                 icon = {
                                     Icon(
@@ -491,6 +515,15 @@ fun MiraiApp() {
                             manga
                         )
                     },
+                    onSavedMangaClick = {
+                            manga,
+                            sourceId ->
+
+                        openMangaFromSavedSource(
+                            manga = manga,
+                            sourceId = sourceId
+                        )
+                    },
                     onContinueReadingClick = {
                             chapter,
                             sourceId ->
@@ -501,6 +534,24 @@ fun MiraiApp() {
                             sourceId =
                                 sourceId
                         )
+                    },
+                    onOpenHistoryClick = {
+                        navController.navigate(
+                            MiraiDestination
+                                .History
+                                .route
+                        ) {
+                            popUpTo(
+                                MiraiDestination
+                                    .Home
+                                    .route
+                            ) {
+                                saveState = true
+                            }
+
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 )
             }
