@@ -56,11 +56,19 @@ private const val AUTH_ROUTE =
 @Composable
 fun MiraiApp() {
     val context =
-        LocalContext.current.applicationContext
+        LocalContext
+            .current
+            .applicationContext
 
     remember(context) {
-        FavoriteStore.initialize(context)
-        SourceRepository.initialize(context)
+        FavoriteStore.initialize(
+            context
+        )
+
+        SourceRepository.initialize(
+            context
+        )
+
         true
     }
 
@@ -73,17 +81,26 @@ fun MiraiApp() {
     val authViewModel =
         viewModel<AuthViewModel>()
 
+    val navigationViewModel =
+        viewModel<MiraiNavigationViewModel>()
+
     val authUiState by
-    authViewModel.uiState.collectAsState()
+    authViewModel
+        .uiState
+        .collectAsState()
 
     val readingProgressStore =
         remember(context) {
-            ReadingProgressStore(context)
+            ReadingProgressStore(
+                context
+            )
         }
 
     val cloudSyncManager =
         remember(context) {
-            CloudSyncManager(context)
+            CloudSyncManager(
+                context
+            )
         }
 
     var showCloudSyncDialog by remember {
@@ -95,28 +112,31 @@ fun MiraiApp() {
     }
 
     var cloudSyncError by remember {
-        mutableStateOf<String?>(null)
-    }
-
-    var selectedManga by remember {
-        mutableStateOf<Manga?>(null)
-    }
-
-    var selectedChapter by remember {
-        mutableStateOf<Chapter?>(null)
-    }
-
-    var selectedChapters by remember {
-        mutableStateOf<List<Chapter>>(
-            emptyList()
+        mutableStateOf<String?>(
+            null
         )
     }
 
+    val selectedManga =
+        navigationViewModel
+            .selectedManga
+
+    val selectedChapter =
+        navigationViewModel
+            .selectedChapter
+
+    val selectedChapters =
+        navigationViewModel
+            .selectedChapters
+
     val backStack by
-    navController.currentBackStackEntryAsState()
+    navController
+        .currentBackStackEntryAsState()
 
     val currentRoute =
-        backStack?.destination?.route
+        backStack
+            ?.destination
+            ?.route
 
     val showBottomBar =
         currentRoute != DETAILS_ROUTE &&
@@ -126,7 +146,10 @@ fun MiraiApp() {
     fun openManga(
         manga: Manga
     ) {
-        selectedManga = manga
+        navigationViewModel
+            .selectManga(
+                manga
+            )
 
         navController.navigate(
             DETAILS_ROUTE
@@ -146,7 +169,9 @@ fun MiraiApp() {
             return
         }
 
-        openManga(manga)
+        openManga(
+            manga
+        )
     }
 
     fun loadSavedMangaChapters(
@@ -164,14 +189,18 @@ fun MiraiApp() {
                     ) {
                         source.getChapters(
                             Manga(
-                                id = chapter.mangaId,
-                                title = chapter.mangaId,
-                                description = ""
+                                id =
+                                    chapter.mangaId,
+                                title =
+                                    chapter.mangaId,
+                                description =
+                                    ""
                             )
                         )
                     }
                 } catch (
-                    exception: CancellationException
+                    exception:
+                    CancellationException
                 ) {
                     throw exception
                 } catch (
@@ -186,15 +215,19 @@ fun MiraiApp() {
                     .id == sourceId
 
             val isSameManga =
-                selectedChapter
-                    ?.mangaId == chapter.mangaId
+                navigationViewModel
+                    .selectedChapter
+                    ?.mangaId ==
+                        chapter.mangaId
 
             if (
                 isSameSource &&
                 isSameManga
             ) {
-                selectedChapters =
-                    loadedChapters
+                navigationViewModel
+                    .updateSelectedChapters(
+                        loadedChapters
+                    )
             }
         }
     }
@@ -212,8 +245,12 @@ fun MiraiApp() {
             return
         }
 
-        selectedChapter = chapter
-        selectedChapters = emptyList()
+        navigationViewModel
+            .selectChapter(
+                chapter = chapter,
+                chapters =
+                    emptyList()
+            )
 
         navController.navigate(
             READER_ROUTE
@@ -231,13 +268,16 @@ fun MiraiApp() {
         chapter: Chapter
     ) {
         val sourceId =
-            SourceRepository.currentSource.id
+            SourceRepository
+                .currentSource
+                .id
 
         val savedReading =
             readingProgressStore
                 .getHistory()
                 .firstOrNull { item ->
-                    item.sourceId == sourceId &&
+                    item.sourceId ==
+                            sourceId &&
                             item.mangaId ==
                             chapter.mangaId
                 }
@@ -245,24 +285,32 @@ fun MiraiApp() {
 
         val savedManga =
             Manga(
-                id = savedReading.mangaId,
-                title = savedReading.mangaTitle,
-                description = "",
+                id =
+                    savedReading.mangaId,
+                title =
+                    savedReading.mangaTitle,
+                description =
+                    "",
                 coverUrl =
-                    savedReading.mangaCoverUrl
+                    savedReading
+                        .mangaCoverUrl
             )
 
-        readingProgressStore.registerReading(
-            manga = savedManga,
-            chapter = chapter,
-            sourceId = sourceId
-        )
+        readingProgressStore
+            .registerReading(
+                manga = savedManga,
+                chapter = chapter,
+                sourceId = sourceId
+            )
     }
 
     fun selectReaderChapter(
         chapter: Chapter
     ) {
-        selectedChapter = chapter
+        navigationViewModel
+            .updateSelectedChapter(
+                chapter
+            )
 
         updateHistoryForChapter(
             chapter
@@ -305,7 +353,8 @@ fun MiraiApp() {
                         throwable.message
                             ?: "Não foi possível restaurar os dados da conta."
 
-                    showCloudSyncDialog = true
+                    showCloudSyncDialog =
+                        true
                 }
         }
     }
@@ -327,7 +376,10 @@ fun MiraiApp() {
                         cloudSyncManager
                             .uploadLocalData()
 
-                    if (uploadResult.isFailure) {
+                    if (
+                        uploadResult
+                            .isFailure
+                    ) {
                         uploadResult
                     } else {
                         cloudSyncManager
@@ -346,7 +398,8 @@ fun MiraiApp() {
                         throwable.message
                             ?: "Não foi possível sincronizar os dados."
 
-                    showCloudSyncDialog = true
+                    showCloudSyncDialog =
+                        true
                 }
         }
     }
@@ -357,39 +410,51 @@ fun MiraiApp() {
                 NavigationBar {
                     MiraiDestination
                         .bottomItems
-                        .forEach { destination ->
+                        .forEach {
+                                destination ->
+
                             NavigationBarItem(
                                 selected =
                                     currentRoute ==
-                                            destination.route,
+                                            destination
+                                                .route,
                                 onClick = {
-                                    navController.navigate(
-                                        destination.route
-                                    ) {
-                                        popUpTo(
-                                            MiraiDestination
-                                                .Home
+                                    navController
+                                        .navigate(
+                                            destination
                                                 .route
                                         ) {
-                                            saveState = true
-                                        }
+                                            popUpTo(
+                                                MiraiDestination
+                                                    .Home
+                                                    .route
+                                            ) {
+                                                saveState =
+                                                    true
+                                            }
 
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
+                                            launchSingleTop =
+                                                true
+
+                                            restoreState =
+                                                true
+                                        }
                                 },
                                 icon = {
                                     Icon(
                                         imageVector =
-                                            destination.icon,
+                                            destination
+                                                .icon,
                                         contentDescription =
-                                            destination.label
+                                            destination
+                                                .label
                                     )
                                 },
                                 label = {
                                     Text(
                                         text =
-                                            destination.label
+                                            destination
+                                                .label
                                     )
                                 },
                                 colors =
@@ -402,43 +467,64 @@ fun MiraiApp() {
         }
     ) { innerPadding ->
         NavHost(
-            navController = navController,
+            navController =
+                navController,
             startDestination =
-                MiraiDestination.Home.route,
+                MiraiDestination
+                    .Home
+                    .route,
             modifier =
-                Modifier.padding(innerPadding)
+                Modifier.padding(
+                    innerPadding
+                )
         ) {
             composable(
-                MiraiDestination.Home.route
+                MiraiDestination
+                    .Home
+                    .route
             ) {
                 HomeScreen(
-                    onMangaClick = { manga ->
-                        openManga(manga)
+                    onMangaClick = {
+                            manga ->
+
+                        openManga(
+                            manga
+                        )
                     },
                     onContinueReadingClick = {
                             chapter,
                             sourceId ->
 
                         openSavedChapter(
-                            chapter = chapter,
-                            sourceId = sourceId
+                            chapter =
+                                chapter,
+                            sourceId =
+                                sourceId
                         )
                     }
                 )
             }
 
             composable(
-                MiraiDestination.Catalog.route
+                MiraiDestination
+                    .Catalog
+                    .route
             ) {
                 CatalogScreen(
-                    onMangaClick = { manga ->
-                        openManga(manga)
+                    onMangaClick = {
+                            manga ->
+
+                        openManga(
+                            manga
+                        )
                     }
                 )
             }
 
             composable(
-                MiraiDestination.Library.route
+                MiraiDestination
+                    .Library
+                    .route
             ) {
                 LibraryScreen(
                     onMangaClick = {
@@ -446,15 +532,19 @@ fun MiraiApp() {
                             sourceId ->
 
                         openMangaFromSavedSource(
-                            manga = manga,
-                            sourceId = sourceId
+                            manga =
+                                manga,
+                            sourceId =
+                                sourceId
                         )
                     }
                 )
             }
 
             composable(
-                MiraiDestination.History.route
+                MiraiDestination
+                    .History
+                    .route
             ) {
                 HistoryScreen(
                     onContinueReading = {
@@ -462,15 +552,19 @@ fun MiraiApp() {
                             sourceId ->
 
                         openSavedChapter(
-                            chapter = chapter,
-                            sourceId = sourceId
+                            chapter =
+                                chapter,
+                            sourceId =
+                                sourceId
                         )
                     }
                 )
             }
 
             composable(
-                MiraiDestination.Settings.route
+                MiraiDestination
+                    .Settings
+                    .route
             ) {
                 SettingsScreen(
                     currentUserEmail =
@@ -478,23 +572,31 @@ fun MiraiApp() {
                             .currentUser
                             ?.email,
                     onAuthenticationClick = {
-                        authViewModel.clearMessage()
+                        authViewModel
+                            .clearMessage()
 
                         cloudSyncError = null
-                        showCloudSyncDialog = false
+                        showCloudSyncDialog =
+                            false
 
                         navController.navigate(
                             AUTH_ROUTE
                         ) {
-                            launchSingleTop = true
+                            launchSingleTop =
+                                true
                         }
                     },
                     onLogoutClick = {
                         authViewModel.logout()
 
-                        showCloudSyncDialog = false
-                        isCloudSyncing = false
-                        cloudSyncError = null
+                        showCloudSyncDialog =
+                            false
+
+                        isCloudSyncing =
+                            false
+
+                        cloudSyncError =
+                            null
                     }
                 )
             }
@@ -503,7 +605,8 @@ fun MiraiApp() {
                 AUTH_ROUTE
             ) {
                 val currentUser =
-                    authUiState.currentUser
+                    authUiState
+                        .currentUser
 
                 LaunchedEffect(
                     currentUser?.id
@@ -513,24 +616,29 @@ fun MiraiApp() {
                     }
 
                     val hasLocalData =
-                        cloudSyncManager.hasLocalData()
+                        cloudSyncManager
+                            .hasLocalData()
 
                     if (hasLocalData) {
-                        showCloudSyncDialog = true
+                        showCloudSyncDialog =
+                            true
                     } else {
                         restoreCloudData()
                     }
                 }
 
                 AuthScreen(
-                    uiState = authUiState,
+                    uiState =
+                        authUiState,
                     onLoginClick = {
                             email,
                             password ->
 
                         authViewModel.login(
-                            email = email,
-                            password = password
+                            email =
+                                email,
+                            password =
+                                password
                         )
                     },
                     onRegisterClick = {
@@ -538,18 +646,25 @@ fun MiraiApp() {
                             password ->
 
                         authViewModel.register(
-                            email = email,
-                            password = password
+                            email =
+                                email,
+                            password =
+                                password
                         )
                     },
                     onBackClick = {
                         if (!isCloudSyncing) {
-                            authViewModel.clearMessage()
+                            authViewModel
+                                .clearMessage()
 
-                            showCloudSyncDialog = false
-                            cloudSyncError = null
+                            showCloudSyncDialog =
+                                false
 
-                            navController.popBackStack()
+                            cloudSyncError =
+                                null
+
+                            navController
+                                .popBackStack()
                         }
                     }
                 )
@@ -580,14 +695,20 @@ fun MiraiApp() {
                     DetailsScreen(
                         manga = manga,
                         onBackClick = {
-                            navController.popBackStack()
+                            navController
+                                .popBackStack()
                         },
                         onChapterClick = {
                                 chapter,
                                 chapters ->
 
-                            selectedChapter = chapter
-                            selectedChapters = chapters
+                            navigationViewModel
+                                .selectChapter(
+                                    chapter =
+                                        chapter,
+                                    chapters =
+                                        chapters
+                                )
 
                             navController.navigate(
                                 READER_ROUTE
@@ -610,8 +731,10 @@ fun MiraiApp() {
 
                 if (chapter != null) {
                     ReaderScreen(
-                        chapter = chapter,
-                        chapters = selectedChapters,
+                        chapter =
+                            chapter,
+                        chapters =
+                            selectedChapters,
                         onChapterSelected = {
                                 newChapter ->
 
@@ -620,7 +743,8 @@ fun MiraiApp() {
                             )
                         },
                         onBackClick = {
-                            navController.popBackStack()
+                            navController
+                                .popBackStack()
                         }
                     )
                 } else {

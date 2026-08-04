@@ -99,25 +99,28 @@ internal object MangaLivreSelectors {
     const val PAGE_ID_PREFIX =
         "page-"
 
-    val PAGE_DIRECT_IMAGE_ATTRIBUTES = listOf(
-        "data-full",
-        "data-full-url",
-        "data-original",
-        "data-original-src",
-        "data-high-res-src",
-        "data-hires",
-        "data-src"
-    )
+    val PAGE_ORIGINAL_IMAGE_ATTRIBUTES =
+        listOf(
+            "data-full",
+            "data-full-url",
+            "data-original",
+            "data-original-src",
+            "data-high-res-src",
+            "data-hires"
+        )
 
-    val PAGE_SRCSET_ATTRIBUTES = listOf(
-        "data-srcset",
-        "data-lazy-srcset",
-        "srcset"
-    )
+    val PAGE_SRCSET_ATTRIBUTES =
+        listOf(
+            "data-srcset",
+            "data-lazy-srcset",
+            "srcset"
+        )
 
-    val PAGE_LAZY_IMAGE_ATTRIBUTES = listOf(
-        "data-lazy-src",
-        "data-url",
-        "src"
-    )
+    val PAGE_FALLBACK_IMAGE_ATTRIBUTES =
+        listOf(
+            "data-src",
+            "data-lazy-src",
+            "data-url",
+            "src"
+        )
 }

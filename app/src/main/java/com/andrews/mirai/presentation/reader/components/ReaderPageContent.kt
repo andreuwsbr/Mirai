@@ -1,6 +1,5 @@
 package com.andrews.mirai.presentation.reader.components
 
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,11 +35,15 @@ fun ReaderPageContent(
     backgroundColor: Color,
     onTap: () -> Unit
 ) {
-    var imageFile by remember(page.imageUrl) {
+    var imageFile by remember(
+        page.imageUrl
+    ) {
         mutableStateOf<File?>(null)
     }
 
-    var aspectRatio by remember(page.imageUrl) {
+    var aspectRatio by remember(
+        page.imageUrl
+    ) {
         mutableStateOf(
             imageDownloader.getCachedAspectRatio(
                 page.imageUrl
@@ -48,15 +51,21 @@ fun ReaderPageContent(
         )
     }
 
-    var isLoading by remember(page.imageUrl) {
+    var isLoading by remember(
+        page.imageUrl
+    ) {
         mutableStateOf(true)
     }
 
-    var errorMessage by remember(page.imageUrl) {
+    var errorMessage by remember(
+        page.imageUrl
+    ) {
         mutableStateOf<String?>(null)
     }
 
-    LaunchedEffect(page.imageUrl) {
+    LaunchedEffect(
+        page.imageUrl
+    ) {
         isLoading = true
         errorMessage = null
 
@@ -68,14 +77,32 @@ fun ReaderPageContent(
             imageFile = downloadedImage.file
             aspectRatio = downloadedImage.aspectRatio
         }.onFailure { throwable ->
-            errorMessage = throwable.message
-                ?: "Não foi possível carregar esta página."
+            imageFile = null
+
+            errorMessage =
+                throwable.message
+                    ?: "Não foi possível carregar esta página."
         }
 
         isLoading = false
     }
 
-    val knownAspectRatio = aspectRatio
+    val currentImageFile =
+        imageFile
+
+    val knownAspectRatio =
+        aspectRatio
+
+    /*
+     * Uma página com proporção abaixo de 0,20 é
+     * considerada extremamente comprida.
+     *
+     * Exemplo do capítulo 246:
+     * 800 / 15000 = aproximadamente 0,053.
+     */
+    val isLongPage =
+        knownAspectRatio != null &&
+                knownAspectRatio <= LONG_PAGE_RATIO_LIMIT
 
     Box(
         modifier = when {
@@ -114,16 +141,18 @@ fun ReaderPageContent(
                         .fillMaxWidth()
                         .heightIn(min = 220.dp)
                         .padding(24.dp),
-                    color = MaterialTheme.colorScheme.error,
+                    color =
+                        MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center
                 )
             }
 
-            imageFile != null &&
+            currentImageFile != null &&
                     knownAspectRatio != null -> {
                 MiraiReaderImage(
-                    imageFileUri = Uri.fromFile(imageFile),
+                    imageFile = currentImageFile,
                     zoomEnabled = paged,
+                    longPage = isLongPage,
                     onTap = onTap,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -146,15 +175,23 @@ private fun PageLoadingContent(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 280.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment =
+            Alignment.CenterHorizontally,
+        verticalArrangement =
+            Arrangement.Center
     ) {
         CircularProgressIndicator()
 
         Text(
-            text = "Carregando página $pageNumber...",
-            modifier = Modifier.padding(top = 12.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            text =
+                "Carregando página $pageNumber...",
+            modifier =
+                Modifier.padding(top = 12.dp),
+            color =
+                MaterialTheme.colorScheme.onSurface
         )
     }
 }
+
+private const val LONG_PAGE_RATIO_LIMIT =
+    0.20f

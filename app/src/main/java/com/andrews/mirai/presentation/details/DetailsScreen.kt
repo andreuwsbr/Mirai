@@ -454,7 +454,7 @@ fun DetailsScreen(
 
                     onChapterClick(
                         chapter,
-                        chapters
+                        filteredChapters
                     )
                 },
                 onDownloadClick = {

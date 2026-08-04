@@ -4,12 +4,23 @@ import com.andrews.mirai.domain.model.Chapter
 
 object ReaderChapterNavigation {
 
+    /*
+     * A ordem recebida deve ser preservada.
+     *
+     * A tela de detalhes já organiza os capítulos
+     * de acordo com a escolha do usuário.
+     *
+     * Não ordenar novamente aqui, pois isso cria
+     * divergência entre a lista exibida e a lista
+     * usada pelo leitor.
+     */
     fun orderedChapters(
         chapters: List<Chapter>
     ): List<Chapter> {
-        return chapters.sortedBy { chapter ->
-            chapter.number
-        }
+        return chapters
+            .distinctBy { chapter ->
+                chapter.id
+            }
     }
 
     fun indexOf(
@@ -31,13 +42,13 @@ object ReaderChapterNavigation {
                 chapter = chapter
             )
 
-        return if (chapterIndex > 0) {
-            chapters.getOrNull(
-                chapterIndex - 1
-            )
-        } else {
-            null
+        if (chapterIndex <= 0) {
+            return null
         }
+
+        return chapters.getOrNull(
+            chapterIndex - 1
+        )
     }
 
     fun nextChapter(
@@ -50,12 +61,12 @@ object ReaderChapterNavigation {
                 chapter = chapter
             )
 
-        return if (chapterIndex >= 0) {
-            chapters.getOrNull(
-                chapterIndex + 1
-            )
-        } else {
-            null
+        if (chapterIndex < 0) {
+            return null
         }
+
+        return chapters.getOrNull(
+            chapterIndex + 1
+        )
     }
 }
