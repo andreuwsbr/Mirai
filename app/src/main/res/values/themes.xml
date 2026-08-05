@@ -1,13 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <resources>
 
     <style
         name="Theme.Mirai"
         parent="android:style/Theme.Material.Light.NoActionBar">
 
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowLightStatusBar">
+            false
+        </item>
+
+        <item name="android:statusBarColor">
+            @android:color/transparent
+        </item>
+
+        <item name="android:navigationBarColor">
+            @android:color/black
+        </item>
+
+        <item name="android:windowBackground">
+            @android:color/black
+        </item>
 
     </style>
 
@@ -15,14 +28,16 @@
         name="Theme.Mirai.Starting"
         parent="Theme.SplashScreen">
 
-        <item name="windowSplashScreenBackground">#0D0D0D</item>
+        <item name="windowSplashScreenBackground">
+            #000000
+        </item>
 
         <item name="windowSplashScreenAnimatedIcon">
-            @mipmap/ic_mirai
+            @drawable/splash_transparent
         </item>
 
         <item name="windowSplashScreenIconBackgroundColor">
-            #0D0D0D
+            #000000
         </item>
 
         <item name="postSplashScreenTheme">
