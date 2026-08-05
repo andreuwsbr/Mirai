@@ -6,13 +6,23 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
 import com.andrews.mirai.presentation.reader.components.ReaderPageContent
+import com.andrews.mirai.presentation.reader.gesture.ReaderTapAction
+import com.andrews.mirai.presentation.reader.gesture.readerTapOverlay
+import com.andrews.mirai.presentation.reader.navigation.ReaderNavigationResult
+import com.andrews.mirai.presentation.reader.navigation.ReaderPageDirection
+import com.andrews.mirai.presentation.reader.navigation.ReaderPageNavigator
+import com.andrews.mirai.presentation.reader.settings.ReaderTapMode
+import com.andrews.mirai.presentation.reader.settings.ReaderTapZoneSize
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -20,57 +30,178 @@ fun VerticalPagedReader(
     pages: List<ReaderPage>,
     initialPage: Int,
     requestedPage: Int?,
+    tapMode: ReaderTapMode,
+    tapZoneSize: ReaderTapZoneSize,
     imageDownloader: ReaderImageDownloader,
     backgroundColor: Color,
     onPageChanged: (Int) -> Unit,
+    onPreviousChapterRequested: () -> Unit,
+    onNextChapterRequested: () -> Unit,
     onRequestedPageConsumed: () -> Unit,
-    onTap: () -> Unit
+    onCenterTap: () -> Unit
 ) {
-    val safeInitialPage = initialPage.coerceIn(
-        minimumValue = 0,
-        maximumValue = pages.lastIndex
-    )
+    val safeInitialPage =
+        initialPage.coerceIn(
+            minimumValue = 0,
+            maximumValue =
+                pages
+                    .lastIndex
+                    .coerceAtLeast(0)
+        )
 
-    val pagerState = rememberPagerState(
-        initialPage = safeInitialPage,
-        pageCount = {
+    val pagerState =
+        rememberPagerState(
+            initialPage =
+                safeInitialPage,
+            pageCount = {
+                pages.size
+            }
+        )
+
+    val coroutineScope =
+        rememberCoroutineScope()
+
+    val pageNavigator =
+        remember(
             pages.size
+        ) {
+            ReaderPageNavigator(
+                totalPages =
+                    pages.size
+            )
         }
-    )
 
-    LaunchedEffect(pagerState) {
+    fun executeNavigation(
+        direction: ReaderPageDirection
+    ) {
+        when (
+            val result =
+                pageNavigator.navigate(
+                    currentPage =
+                        pagerState.currentPage,
+                    direction =
+                        direction
+                )
+        ) {
+            is ReaderNavigationResult.Page -> {
+                coroutineScope.launch {
+                    pagerState
+                        .animateScrollToPage(
+                            result.pageIndex
+                        )
+                }
+            }
+
+            ReaderNavigationResult
+                .PreviousChapter -> {
+                onPreviousChapterRequested()
+            }
+
+            ReaderNavigationResult
+                .NextChapter -> {
+                onNextChapterRequested()
+            }
+
+            ReaderNavigationResult.None -> {
+                Unit
+            }
+        }
+    }
+
+    LaunchedEffect(
+        pagerState
+    ) {
         snapshotFlow {
             pagerState.currentPage
         }
             .distinctUntilChanged()
             .collect { pageIndex ->
-                onPageChanged(pageIndex)
+                onPageChanged(
+                    pageIndex
+                )
             }
     }
 
-    LaunchedEffect(requestedPage) {
+    LaunchedEffect(
+        requestedPage
+    ) {
         requestedPage?.let { pageIndex ->
-            pagerState.animateScrollToPage(
-                pageIndex.coerceIn(
-                    minimumValue = 0,
-                    maximumValue = pages.lastIndex
+            pagerState
+                .animateScrollToPage(
+                    pageIndex.coerceIn(
+                        minimumValue = 0,
+                        maximumValue =
+                            pages
+                                .lastIndex
+                                .coerceAtLeast(0)
+                    )
                 )
-            )
 
             onRequestedPageConsumed()
         }
     }
 
     VerticalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxSize()
+        state =
+            pagerState,
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .readerTapOverlay(
+                    enabled =
+                        tapMode ==
+                                ReaderTapMode
+                                    .TAP_AND_SWIPE,
+                    edgeFraction =
+                        tapZoneSize
+                            .edgeFraction,
+                    vertical =
+                        true,
+                    reverseReadingDirection =
+                        false,
+                    onAction = { action ->
+                        when (action) {
+                            ReaderTapAction
+                                .PREVIOUS_PAGE -> {
+                                executeNavigation(
+                                    ReaderPageDirection
+                                        .PREVIOUS
+                                )
+                            }
+
+                            ReaderTapAction
+                                .NEXT_PAGE -> {
+                                executeNavigation(
+                                    ReaderPageDirection
+                                        .NEXT
+                                )
+                            }
+
+                            ReaderTapAction
+                                .TOGGLE_CONTROLS -> {
+                                onCenterTap()
+                            }
+                        }
+                    }
+                )
     ) { pageIndex ->
         ReaderPageContent(
-            page = pages[pageIndex],
-            imageDownloader = imageDownloader,
-            paged = true,
-            backgroundColor = backgroundColor,
-            onTap = onTap
+            page =
+                pages[pageIndex],
+            imageDownloader =
+                imageDownloader,
+            paged =
+                true,
+            backgroundColor =
+                backgroundColor,
+            onTap = {
+                if (
+                    tapMode ==
+                    ReaderTapMode.SWIPE_ONLY
+                ) {
+                    onCenterTap()
+                }
+            }
         )
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 fun ReaderBottomBar(
     currentPage: Int,
     totalPages: Int,
+    showPageNumber: Boolean,
     hasPreviousChapter: Boolean,
     hasNextChapter: Boolean,
     onPageSelected: (Int) -> Unit,
@@ -33,101 +34,159 @@ fun ReaderBottomBar(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color(0xE6111725))
-            .padding(
-                horizontal = 16.dp,
-                vertical = 8.dp
-            )
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(
+                    Color(
+                        0xE6111725
+                    )
+                )
+                .padding(
+                    horizontal = 16.dp,
+                    vertical = 8.dp
+                )
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier.fillMaxWidth(),
             horizontalArrangement =
                 Arrangement.SpaceBetween,
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
             TextButton(
-                enabled = hasPreviousChapter,
-                onClick = onPreviousChapterClick
+                enabled =
+                    hasPreviousChapter,
+                onClick =
+                    onPreviousChapterClick
             ) {
                 Text(
-                    text = "← Anterior",
-                    color = if (hasPreviousChapter) {
-                        Color.White
-                    } else {
-                        Color.Gray
-                    }
+                    text =
+                        "← Anterior",
+                    color =
+                        if (
+                            hasPreviousChapter
+                        ) {
+                            Color.White
+                        } else {
+                            Color.Gray
+                        }
                 )
             }
 
             TextButton(
-                enabled = hasNextChapter,
-                onClick = onNextChapterClick
+                enabled =
+                    hasNextChapter,
+                onClick =
+                    onNextChapterClick
             ) {
                 Text(
-                    text = "Próximo →",
-                    color = if (hasNextChapter) {
-                        Color.White
-                    } else {
-                        Color.Gray
-                    }
+                    text =
+                        "Próximo →",
+                    color =
+                        if (
+                            hasNextChapter
+                        ) {
+                            Color.White
+                        } else {
+                            Color.Gray
+                        }
                 )
             }
         }
 
         Row(
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
-            Text(
-                text = "${currentPage + 1}",
-                color = Color.White
-            )
+            if (
+                showPageNumber &&
+                totalPages > 0
+            ) {
+                Text(
+                    text =
+                        "${currentPage + 1}",
+                    color =
+                        Color.White
+                )
+            }
 
             Slider(
-                value = currentPage.toFloat(),
+                value =
+                    currentPage
+                        .toFloat(),
                 onValueChange = { value ->
-                    onPageSelected(value.toInt())
+                    onPageSelected(
+                        value.toInt()
+                    )
                 },
-                valueRange = 0f..
-                        (totalPages - 1)
-                            .coerceAtLeast(0)
-                            .toFloat(),
-                steps = (totalPages - 2)
-                    .coerceAtLeast(0),
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 10.dp)
+                valueRange =
+                    0f..
+                            (
+                                    totalPages - 1
+                                    )
+                                .coerceAtLeast(
+                                    0
+                                )
+                                .toFloat(),
+                steps =
+                    (
+                            totalPages - 2
+                            ).coerceAtLeast(
+                            0
+                        ),
+                modifier =
+                    Modifier
+                        .weight(
+                            1f
+                        )
+                        .padding(
+                            horizontal = 10.dp
+                        )
             )
 
-            Text(
-                text = "$totalPages",
-                color = Color.White
-            )
+            if (
+                showPageNumber &&
+                totalPages > 0
+            ) {
+                Text(
+                    text =
+                        "$totalPages",
+                    color =
+                        Color.White
+                )
+            }
 
             IconButton(
-                onClick = onSettingsClick
+                onClick =
+                    onSettingsClick
             ) {
                 Icon(
                     imageVector =
                         Icons.Outlined.Settings,
                     contentDescription =
                         "Configurações",
-                    tint = Color.White
+                    tint =
+                        Color.White
                 )
             }
         }
 
         LinearProgressIndicator(
             progress = {
-                if (totalPages > 0) {
-                    (currentPage + 1f) / totalPages
+                if (
+                    totalPages > 0
+                ) {
+                    (
+                            currentPage + 1f
+                            ) / totalPages
                 } else {
                     0f
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier =
+                Modifier.fillMaxWidth()
         )
     }
 }

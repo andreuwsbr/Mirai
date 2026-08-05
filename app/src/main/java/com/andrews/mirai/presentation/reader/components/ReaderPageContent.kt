@@ -15,13 +15,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
@@ -38,53 +38,84 @@ fun ReaderPageContent(
     var imageFile by remember(
         page.imageUrl
     ) {
-        mutableStateOf<File?>(null)
+        mutableStateOf<File?>(
+            null
+        )
     }
 
     var aspectRatio by remember(
         page.imageUrl
     ) {
         mutableStateOf(
-            imageDownloader.getCachedAspectRatio(
-                page.imageUrl
-            )
+            imageDownloader
+                .getCachedAspectRatio(
+                    page.imageUrl
+                )
         )
     }
 
     var isLoading by remember(
         page.imageUrl
     ) {
-        mutableStateOf(true)
+        mutableStateOf(
+            true
+        )
     }
 
     var errorMessage by remember(
         page.imageUrl
     ) {
-        mutableStateOf<String?>(null)
+        mutableStateOf<String?>(
+            null
+        )
+    }
+
+    var retryCount by remember(
+        page.imageUrl
+    ) {
+        mutableIntStateOf(
+            0
+        )
     }
 
     LaunchedEffect(
-        page.imageUrl
+        page.imageUrl,
+        retryCount
     ) {
-        isLoading = true
-        errorMessage = null
+        isLoading =
+            true
+
+        errorMessage =
+            null
 
         runCatching {
             imageDownloader.downloadWithInfo(
                 page.imageUrl
             )
-        }.onSuccess { downloadedImage ->
-            imageFile = downloadedImage.file
-            aspectRatio = downloadedImage.aspectRatio
-        }.onFailure { throwable ->
-            imageFile = null
+        }.onSuccess {
+                downloadedImage ->
+
+            imageFile =
+                downloadedImage.file
+
+            aspectRatio =
+                downloadedImage.aspectRatio
+        }.onFailure {
+                throwable ->
+
+            imageFile =
+                null
 
             errorMessage =
                 throwable.message
-                    ?: "Não foi possível carregar esta página."
+                    ?.takeIf { message ->
+                        message.isNotBlank()
+                    }
+                    ?: "Verifique sua conexão e tente novamente."
         }
 
-        isLoading = false
+        isLoading =
+            false
     }
 
     val currentImageFile =
@@ -93,74 +124,97 @@ fun ReaderPageContent(
     val knownAspectRatio =
         aspectRatio
 
-    /*
-     * Uma página com proporção abaixo de 0,20 é
-     * considerada extremamente comprida.
-     *
-     * Exemplo do capítulo 246:
-     * 800 / 15000 = aproximadamente 0,053.
-     */
     val isLongPage =
         knownAspectRatio != null &&
-                knownAspectRatio <= LONG_PAGE_RATIO_LIMIT
+                knownAspectRatio <=
+                LONG_PAGE_RATIO_LIMIT
 
     Box(
-        modifier = when {
-            paged -> {
-                Modifier
-                    .fillMaxSize()
-                    .background(backgroundColor)
-            }
+        modifier =
+            when {
+                paged -> {
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            backgroundColor
+                        )
+                }
 
-            knownAspectRatio != null -> {
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(knownAspectRatio)
-                    .background(backgroundColor)
-            }
+                knownAspectRatio != null -> {
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(
+                            knownAspectRatio
+                        )
+                        .background(
+                            backgroundColor
+                        )
+                }
 
-            else -> {
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 280.dp)
-                    .background(backgroundColor)
-            }
-        },
-        contentAlignment = Alignment.Center
+                else -> {
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(
+                            min = 280.dp
+                        )
+                        .background(
+                            backgroundColor
+                        )
+                }
+            },
+        contentAlignment =
+            Alignment.Center
     ) {
         when {
+            isLoading -> {
+                PageLoadingContent(
+                    pageNumber =
+                        page.index + 1
+                )
+            }
+
             errorMessage != null -> {
-                Text(
-                    text = buildString {
-                        append("Erro na página ")
-                        append(page.index + 1)
-                        append("\n")
-                        append(errorMessage)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 220.dp)
-                        .padding(24.dp),
-                    color =
-                        MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
+                ReaderPageErrorContent(
+                    pageNumber =
+                        page.index + 1,
+                    message =
+                        errorMessage
+                            ?: "Erro desconhecido.",
+                    retrying =
+                        false,
+                    onRetryClick = {
+                        retryCount += 1
+                    }
                 )
             }
 
             currentImageFile != null &&
                     knownAspectRatio != null -> {
                 MiraiReaderImage(
-                    imageFile = currentImageFile,
-                    zoomEnabled = paged,
-                    longPage = isLongPage,
-                    onTap = onTap,
-                    modifier = Modifier.fillMaxSize()
+                    imageFile =
+                        currentImageFile,
+                    zoomEnabled =
+                        paged,
+                    longPage =
+                        isLongPage,
+                    onTap =
+                        onTap,
+                    modifier =
+                        Modifier.fillMaxSize()
                 )
             }
 
-            isLoading -> {
-                PageLoadingContent(
-                    pageNumber = page.index + 1
+            else -> {
+                ReaderPageErrorContent(
+                    pageNumber =
+                        page.index + 1,
+                    message =
+                        "A imagem não pôde ser exibida.",
+                    retrying =
+                        false,
+                    onRetryClick = {
+                        retryCount += 1
+                    }
                 )
             }
         }
@@ -172,9 +226,12 @@ private fun PageLoadingContent(
     pageNumber: Int
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 280.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min = 280.dp
+                ),
         horizontalAlignment =
             Alignment.CenterHorizontally,
         verticalArrangement =
@@ -186,9 +243,13 @@ private fun PageLoadingContent(
             text =
                 "Carregando página $pageNumber...",
             modifier =
-                Modifier.padding(top = 12.dp),
+                Modifier.padding(
+                    top = 12.dp
+                ),
             color =
-                MaterialTheme.colorScheme.onSurface
+                MaterialTheme
+                    .colorScheme
+                    .onSurface
         )
     }
 }

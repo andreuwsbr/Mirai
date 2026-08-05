@@ -31,18 +31,26 @@ internal fun BoxScope.ReaderControls(
         visible =
             controlsVisible &&
                     !settingsVisible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier.align(
-            Alignment.TopCenter
-        )
+        enter =
+            fadeIn(),
+        exit =
+            fadeOut(),
+        modifier =
+            Modifier.align(
+                Alignment.TopCenter
+            )
     ) {
         ReaderTopBar(
-            chapterName = chapterName,
-            currentPage = currentPageIndex + 1,
-            totalPages = totalPages,
-            showPageNumber = showPageNumber,
-            onBackClick = onBackClick
+            chapterName =
+                chapterName,
+            currentPage =
+                currentPageIndex + 1,
+            totalPages =
+                totalPages,
+            showPageNumber =
+                showPageNumber,
+            onBackClick =
+                onBackClick
         )
     }
 
@@ -51,25 +59,34 @@ internal fun BoxScope.ReaderControls(
             controlsVisible &&
                     !settingsVisible &&
                     pagesAvailable,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier.align(
-            Alignment.BottomCenter
-        )
+        enter =
+            fadeIn(),
+        exit =
+            fadeOut(),
+        modifier =
+            Modifier.align(
+                Alignment.BottomCenter
+            )
     ) {
         ReaderBottomBar(
-            currentPage = currentPageIndex,
-            totalPages = totalPages,
+            currentPage =
+                currentPageIndex,
+            totalPages =
+                totalPages,
+            showPageNumber =
+                showPageNumber,
             hasPreviousChapter =
                 hasPreviousChapter,
             hasNextChapter =
                 hasNextChapter,
-            onPageSelected = onPageSelected,
+            onPageSelected =
+                onPageSelected,
             onPreviousChapterClick =
                 onPreviousChapterClick,
             onNextChapterClick =
                 onNextChapterClick,
-            onSettingsClick = onSettingsClick
+            onSettingsClick =
+                onSettingsClick
         )
     }
 }

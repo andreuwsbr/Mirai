@@ -24,28 +24,25 @@ import com.andrews.mirai.data.repository.SourceRepository
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.presentation.reader.cache.ReaderImageCache
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
-import com.andrews.mirai.presentation.reader.components.ReaderErrorContent
+import com.andrews.mirai.presentation.reader.components.ReaderChapterErrorContent
 import com.andrews.mirai.presentation.reader.components.ReaderLoadingContent
+import com.andrews.mirai.presentation.reader.display.ReaderBrightnessEffect
+import com.andrews.mirai.presentation.reader.display.ReaderOrientationEffect
 import com.andrews.mirai.presentation.reader.logic.ReaderChapterController
 import com.andrews.mirai.presentation.reader.logic.ReaderChapterPageLoader
 import com.andrews.mirai.presentation.reader.logic.ReaderLongStripMapper
 import com.andrews.mirai.presentation.reader.logic.ReaderPageProvider
 import com.andrews.mirai.presentation.reader.logic.ReaderPreloader
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
-import com.andrews.mirai.presentation.reader.session.ReaderSession
+import com.andrews.mirai.presentation.reader.retry.ReaderRetryController
 import com.andrews.mirai.presentation.reader.settings.ReaderBackground
 import com.andrews.mirai.presentation.reader.settings.ReaderMode
 import com.andrews.mirai.presentation.reader.settings.ReaderSettingsSheet
 import com.andrews.mirai.presentation.reader.settings.ReaderSettingsStore
 import com.andrews.mirai.presentation.reader.state.ReaderChapterPagesState
 import com.andrews.mirai.presentation.reader.state.ReaderScreenState
+import com.andrews.mirai.presentation.reader.state.ReaderUiState
 import kotlinx.coroutines.launch
-
-private const val PRELOAD_DISTANCE =
-    6
-
-private const val NEXT_CHAPTER_PRELOAD_PAGES =
-    2
 
 @Composable
 fun ReaderScreen(
@@ -63,50 +60,37 @@ fun ReaderScreen(
     val coroutineScope =
         rememberCoroutineScope()
 
-    /*
-     * Cria a lista cronológica usada pelo leitor.
-     *
-     * Essa lista será sempre organizada do capítulo
-     * menor para o maior, independentemente da ordem
-     * recebida da fonte ou da tela anterior.
-     */
-    val initialSession =
-        remember(
-            chapters,
-            chapter
-        ) {
-            ReaderSession.create(
-                chapters = chapters,
-                activeChapter = chapter
-            )
-        }
-
-    val orderedChapters =
-        initialSession.chapters
-
     val progressStore =
-        remember(applicationContext) {
+        remember(
+            applicationContext
+        ) {
             ReadingProgressStore(
                 applicationContext
             )
         }
 
     val settingsStore =
-        remember(applicationContext) {
+        remember(
+            applicationContext
+        ) {
             ReaderSettingsStore(
                 applicationContext
             )
         }
 
     val imageCache =
-        remember(applicationContext) {
+        remember(
+            applicationContext
+        ) {
             ReaderImageCache(
                 applicationContext
             )
         }
 
     val imageDownloader =
-        remember(imageCache) {
+        remember(
+            imageCache
+        ) {
             ReaderImageDownloader(
                 imageCache
             )
@@ -118,13 +102,17 @@ fun ReaderScreen(
             sourceId
         ) {
             ReaderPageProvider(
-                context = applicationContext,
-                sourceId = sourceId
+                context =
+                    applicationContext,
+                sourceId =
+                    sourceId
             )
         }
 
     val chapterPageLoader =
-        remember(pageProvider) {
+        remember(
+            pageProvider
+        ) {
             ReaderChapterPageLoader(
                 pageProvider
             )
@@ -132,14 +120,32 @@ fun ReaderScreen(
 
     val screenState =
         remember(
-            chapter.mangaId
+            chapter.mangaId,
+            sourceId
         ) {
             ReaderScreenState(
-                initialChapter = chapter,
+                initialChapter =
+                    chapter,
                 initialPageIndex =
                     progressStore.getPage(
-                        chapter.id
+                        chapterId =
+                            chapter.id,
+                        sourceId =
+                            sourceId
                     )
+            )
+        }
+
+    val readerViewModel =
+        remember(
+            chapter.mangaId,
+            sourceId
+        ) {
+            ReaderViewModel(
+                initialChapter =
+                    chapter,
+                initialChapters =
+                    chapters
             )
         }
 
@@ -150,14 +156,32 @@ fun ReaderScreen(
             progressStore
         ) {
             ReaderChapterController(
-                screenState = screenState,
-                pageLoader = chapterPageLoader,
-                progressStore = progressStore
+                screenState =
+                    screenState,
+                pageLoader =
+                    chapterPageLoader,
+                progressStore =
+                    progressStore
+            )
+        }
+
+    val retryController =
+        remember(
+            chapterController,
+            imageCache
+        ) {
+            ReaderRetryController(
+                chapterController =
+                    chapterController,
+                imageCache =
+                    imageCache
             )
         }
 
     val preloader =
-        remember(imageDownloader) {
+        remember(
+            imageDownloader
+        ) {
             ReaderPreloader(
                 imageDownloader
             )
@@ -169,36 +193,61 @@ fun ReaderScreen(
         )
     }
 
+    var chapterRetrying by remember(
+        screenState.activeChapter.id
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
+    /*
+     * Atualiza a sessão quando a lista completa
+     * chegar da fonte depois de abrir pela Home
+     * ou pelo Histórico.
+     */
+    LaunchedEffect(
+        chapters,
+        chapter.id
+    ) {
+        readerViewModel.updateChapters(
+            chapters =
+                chapters,
+            activeChapter =
+                screenState.activeChapter
+        )
+    }
+
     val activeChapter =
         screenState.activeChapter
 
-    /*
-     * A sessão é atualizada sempre que o capítulo
-     * ativo ou a lista de capítulos mudar.
-     */
-    val readerSession =
-        remember(
-            orderedChapters,
+    LaunchedEffect(
+        activeChapter.id
+    ) {
+        readerViewModel.selectChapter(
             activeChapter
-        ) {
-            ReaderSession(
-                chapters = orderedChapters,
-                activeChapter = activeChapter
-            )
-        }
+        )
+    }
+
+    val orderedChapters =
+        readerViewModel
+            .orderedChapters
 
     val previousChapter =
-        readerSession.previousChapter
+        readerViewModel
+            .previousChapter
 
     val nextChapter =
-        readerSession.nextChapter
+        readerViewModel
+            .nextChapter
 
     val activeState =
         screenState.getChapterState(
             activeChapter.id
         )
             ?: ReaderChapterPagesState(
-                isLoading = true
+                isLoading =
+                    true
             )
 
     val activePages =
@@ -206,8 +255,10 @@ fun ReaderScreen(
 
     val currentPageIndex =
         screenState.currentPageIndex(
-            chapterId = activeChapter.id,
-            pages = activePages
+            chapterId =
+                activeChapter.id,
+            pages =
+                activePages
         )
 
     val isLongStripMode =
@@ -227,7 +278,8 @@ fun ReaderScreen(
                     orderedChapters =
                         orderedChapters,
                     chapterStates =
-                        screenState.chapterStates,
+                        screenState
+                            .chapterStates,
                     activeChapter =
                         activeChapter
                 )
@@ -262,6 +314,28 @@ fun ReaderScreen(
             Color.White
         }
 
+    val uiState =
+        ReaderUiState(
+            activeChapter =
+                activeChapter,
+            previousChapter =
+                previousChapter,
+            nextChapter =
+                nextChapter,
+            currentPageIndex =
+                currentPageIndex,
+            totalPages =
+                activePages.size,
+            isLoading =
+                activeState.isLoading,
+            errorMessage =
+                activeState.errorMessage,
+            controlsVisible =
+                screenState.controlsVisible,
+            settingsVisible =
+                screenState.settingsVisible
+        )
+
     ReaderSystemUiEffects(
         keepScreenOn =
             preferences.keepScreenOn,
@@ -269,9 +343,22 @@ fun ReaderScreen(
             preferences.fullscreen
     )
 
+    ReaderOrientationEffect(
+        orientationMode =
+            preferences.orientationMode
+    )
+
+    ReaderBrightnessEffect(
+        brightnessPercent =
+            preferences.brightnessPercent
+    )
+
     BackHandler {
-        if (screenState.settingsVisible) {
-            screenState.settingsVisible = false
+        if (
+            screenState.settingsVisible
+        ) {
+            screenState.settingsVisible =
+                false
         } else {
             onBackClick()
         }
@@ -294,23 +381,29 @@ fun ReaderScreen(
             )
     }
 
+    /*
+     * Mantém capítulo anterior e próximo prontos
+     * para troca rápida.
+     */
     LaunchedEffect(
         activeChapter.id,
         orderedChapters
     ) {
-        previousChapter?.let { targetChapter ->
-            chapterController
-                .loadChapterPages(
-                    targetChapter
-                )
-        }
+        previousChapter
+            ?.let { targetChapter ->
+                chapterController
+                    .loadChapterPages(
+                        targetChapter
+                    )
+            }
 
-        nextChapter?.let { targetChapter ->
-            chapterController
-                .loadChapterPages(
-                    targetChapter
-                )
-        }
+        nextChapter
+            ?.let { targetChapter ->
+                chapterController
+                    .loadChapterPages(
+                        targetChapter
+                    )
+            }
     }
 
     LaunchedEffect(
@@ -318,14 +411,18 @@ fun ReaderScreen(
         currentPageIndex,
         activePages.size
     ) {
-        if (activePages.isNotEmpty()) {
+        if (
+            activePages.isNotEmpty()
+        ) {
             progressStore.savePage(
                 chapterId =
                     activeChapter.id,
                 pageIndex =
                     currentPageIndex,
                 totalPages =
-                    activePages.size
+                    activePages.size,
+                sourceId =
+                    sourceId
             )
         }
     }
@@ -335,14 +432,17 @@ fun ReaderScreen(
         currentPageIndex,
         nextChapter,
         screenState.chapterStates,
-        preloader
+        preferences.preloadMode
     ) {
         preloader.preloadCurrentPages(
-            pages = activePages,
+            pages =
+                activePages,
             currentPageIndex =
                 currentPageIndex,
             preloadDistance =
-                PRELOAD_DISTANCE
+                preferences
+                    .preloadMode
+                    .currentChapterPages
         )
 
         val nextChapterPages =
@@ -357,10 +457,67 @@ fun ReaderScreen(
                 .orEmpty()
 
         preloader.preloadNextChapter(
-            pages = nextChapterPages,
+            pages =
+                nextChapterPages,
             maximumPages =
-                NEXT_CHAPTER_PRELOAD_PAGES
+                preferences
+                    .preloadMode
+                    .nextChapterPages
         )
+    }
+
+    fun openPreviousChapterFromBoundary() {
+        val targetChapter =
+            previousChapter
+                ?: return
+
+        coroutineScope.launch {
+            chapterController
+                .openChapterFromControls(
+                    targetChapter =
+                        targetChapter,
+
+                    /*
+                     * Int.MAX_VALUE será limitado para
+                     * a última página pelo controlador.
+                     */
+                    targetPage =
+                        Int.MAX_VALUE,
+
+                    isLongStripMode =
+                        false,
+
+                    onChapterSelected =
+                        onChapterSelected
+                )
+        }
+    }
+
+    fun openNextChapterFromBoundary() {
+        val targetChapter =
+            nextChapter
+                ?: return
+
+        progressStore.markViewed(
+            chapterId =
+                activeChapter.id,
+            sourceId =
+                sourceId
+        )
+
+        coroutineScope.launch {
+            chapterController
+                .openChapterFromControls(
+                    targetChapter =
+                        targetChapter,
+                    targetPage =
+                        0,
+                    isLongStripMode =
+                        false,
+                    onChapterSelected =
+                        onChapterSelected
+                )
+        }
     }
 
     Box(
@@ -372,15 +529,38 @@ fun ReaderScreen(
                 )
     ) {
         when {
-            activeState.isLoading -> {
+            uiState.isLoading -> {
                 ReaderLoadingContent()
             }
 
-            activeState.errorMessage != null -> {
-                ReaderErrorContent(
+            uiState.errorMessage != null -> {
+                ReaderChapterErrorContent(
                     message =
-                        activeState
-                            .errorMessage
+                        uiState.errorMessage,
+                    foregroundColor =
+                        foregroundColor,
+                    retrying =
+                        chapterRetrying,
+                    onRetryClick = {
+                        if (
+                            chapterRetrying
+                        ) {
+                            return@ReaderChapterErrorContent
+                        }
+
+                        coroutineScope.launch {
+                            chapterRetrying =
+                                true
+
+                            retryController
+                                .retryChapter(
+                                    activeChapter
+                                )
+
+                            chapterRetrying =
+                                false
+                        }
+                    }
                 )
             }
 
@@ -419,13 +599,18 @@ fun ReaderScreen(
                         preferences.mode,
                     longStripGapDp =
                         preferences.longStripGapDp,
+                    tapMode =
+                        preferences.tapMode,
+                    tapZoneSize =
+                        preferences.tapZoneSize,
                     initialPage =
                         currentPageIndex,
                     requestedChapterId =
                         screenState
                             .requestedChapterId,
                     requestedPage =
-                        screenState.requestedPage,
+                        screenState
+                            .requestedPage,
                     showFinalCompletion =
                         longStripState
                             .showFinalCompletion,
@@ -451,15 +636,11 @@ fun ReaderScreen(
                                 .id
                         ) {
                             val previousActiveChapter =
-                                screenState.activeChapter
+                                screenState
+                                    .activeChapter
 
-                            /*
-                             * Usa a posição na sessão para saber
-                             * se avançou, em vez de comparar apenas
-                             * o número do capítulo.
-                             */
                             if (
-                                readerSession
+                                readerViewModel
                                     .isForwardMovement(
                                         fromChapter =
                                             previousActiveChapter,
@@ -469,24 +650,39 @@ fun ReaderScreen(
                             ) {
                                 progressStore
                                     .markViewed(
-                                        previousActiveChapter.id
+                                        chapterId =
+                                            previousActiveChapter
+                                                .id,
+                                        sourceId =
+                                            sourceId
                                     )
                             }
 
                             screenState.activeChapter =
                                 visibleChapter
 
+                            readerViewModel.selectChapter(
+                                visibleChapter
+                            )
+
                             onChapterSelected(
                                 visibleChapter
                             )
                         }
+                    },
+                    onPreviousChapterRequested = {
+                        openPreviousChapterFromBoundary()
+                    },
+                    onNextChapterRequested = {
+                        openNextChapterFromBoundary()
                     },
                     onRequestedPageConsumed = {
                         screenState
                             .consumeRequestedPage()
                     },
                     onTap = {
-                        screenState.toggleControls()
+                        screenState
+                            .toggleControls()
                     }
                 )
             }
@@ -494,26 +690,28 @@ fun ReaderScreen(
 
         ReaderControls(
             controlsVisible =
-                screenState.controlsVisible,
+                uiState.controlsVisible,
             settingsVisible =
-                screenState.settingsVisible,
+                uiState.settingsVisible,
             pagesAvailable =
-                activePages.isNotEmpty(),
+                uiState.hasPages,
             chapterName =
-                activeChapter.name,
+                uiState.activeChapter.name,
             currentPageIndex =
-                currentPageIndex,
+                uiState.currentPageIndex,
             totalPages =
-                activePages.size,
+                uiState.totalPages,
             showPageNumber =
                 preferences.showPageNumber,
             hasPreviousChapter =
-                previousChapter != null,
+                uiState.hasPreviousChapter,
             hasNextChapter =
-                nextChapter != null,
+                uiState.hasNextChapter,
             onBackClick =
                 onBackClick,
-            onPageSelected = { pageIndex ->
+            onPageSelected = {
+                    pageIndex ->
+
                 screenState.requestPage(
                     chapterId =
                         activeChapter.id,
@@ -522,52 +720,61 @@ fun ReaderScreen(
                 )
             },
             onPreviousChapterClick = {
-                previousChapter?.let {
-                        targetChapter ->
-
-                    coroutineScope.launch {
-                        chapterController
-                            .openChapterFromControls(
-                                targetChapter =
-                                    targetChapter,
-                                targetPage =
-                                    progressStore
-                                        .getPage(
-                                            targetChapter.id
-                                        ),
-                                isLongStripMode =
-                                    isLongStripMode,
-                                onChapterSelected =
-                                    onChapterSelected
-                            )
+                previousChapter
+                    ?.let { targetChapter ->
+                        coroutineScope.launch {
+                            chapterController
+                                .openChapterFromControls(
+                                    targetChapter =
+                                        targetChapter,
+                                    targetPage =
+                                        progressStore
+                                            .getPage(
+                                                chapterId =
+                                                    targetChapter
+                                                        .id,
+                                                sourceId =
+                                                    sourceId
+                                            ),
+                                    isLongStripMode =
+                                        isLongStripMode,
+                                    onChapterSelected =
+                                        onChapterSelected
+                                )
+                        }
                     }
-                }
             },
             onNextChapterClick = {
-                nextChapter?.let {
-                        targetChapter ->
+                nextChapter
+                    ?.let { targetChapter ->
+                        progressStore.markViewed(
+                            chapterId =
+                                activeChapter.id,
+                            sourceId =
+                                sourceId
+                        )
 
-                    progressStore.markViewed(
-                        activeChapter.id
-                    )
-
-                    coroutineScope.launch {
-                        chapterController
-                            .openChapterFromControls(
-                                targetChapter =
-                                    targetChapter,
-                                targetPage =
-                                    progressStore
-                                        .getPage(
-                                            targetChapter.id
-                                        ),
-                                isLongStripMode =
-                                    isLongStripMode,
-                                onChapterSelected =
-                                    onChapterSelected
-                            )
+                        coroutineScope.launch {
+                            chapterController
+                                .openChapterFromControls(
+                                    targetChapter =
+                                        targetChapter,
+                                    targetPage =
+                                        progressStore
+                                            .getPage(
+                                                chapterId =
+                                                    targetChapter
+                                                        .id,
+                                                sourceId =
+                                                    sourceId
+                                            ),
+                                    isLongStripMode =
+                                        isLongStripMode,
+                                    onChapterSelected =
+                                        onChapterSelected
+                                )
+                        }
                     }
-                }
             },
             onSettingsClick = {
                 screenState.settingsVisible =
@@ -576,7 +783,9 @@ fun ReaderScreen(
         )
     }
 
-    if (screenState.settingsVisible) {
+    if (
+        screenState.settingsVisible
+    ) {
         ReaderSettingsSheet(
             preferences =
                 preferences,

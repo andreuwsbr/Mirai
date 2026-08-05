@@ -7,9 +7,12 @@ import com.andrews.mirai.presentation.reader.state.ReaderScreenState
 import kotlinx.coroutines.CancellationException
 
 class ReaderChapterController(
-    private val screenState: ReaderScreenState,
-    private val pageLoader: ReaderChapterPageLoader,
-    private val progressStore: ReadingProgressStore
+    private val screenState:
+    ReaderScreenState,
+    private val pageLoader:
+    ReaderChapterPageLoader,
+    private val progressStore:
+    ReadingProgressStore
 ) {
 
     suspend fun loadChapterPages(
@@ -23,6 +26,26 @@ class ReaderChapterController(
             return
         }
 
+        loadChapterPagesInternal(
+            chapter
+        )
+    }
+
+    suspend fun retryChapter(
+        chapter: Chapter
+    ) {
+        screenState.removeChapterState(
+            chapter.id
+        )
+
+        loadChapterPagesInternal(
+            chapter
+        )
+    }
+
+    private suspend fun loadChapterPagesInternal(
+        chapter: Chapter
+    ) {
         screenState.markChapterLoading(
             chapter.id
         )
@@ -30,7 +53,8 @@ class ReaderChapterController(
         try {
             val savedPageIndex =
                 screenState.getSavedPage(
-                    chapterId = chapter.id,
+                    chapterId =
+                        chapter.id,
                     fallbackPage =
                         progressStore.getPage(
                             chapter.id
@@ -39,13 +63,15 @@ class ReaderChapterController(
 
             val loadResult =
                 pageLoader.load(
-                    chapter = chapter,
+                    chapter =
+                        chapter,
                     savedPageIndex =
                         savedPageIndex
                 )
 
             screenState.setChapterLoaded(
-                chapterId = chapter.id,
+                chapterId =
+                    chapter.id,
                 chapterState =
                     loadResult.state,
                 safePageIndex =
@@ -65,12 +91,16 @@ class ReaderChapterController(
             )
 
             throw exception
-        } catch (throwable: Throwable) {
+        } catch (
+            throwable: Throwable
+        ) {
             screenState.setChapterError(
-                chapterId = chapter.id,
+                chapterId =
+                    chapter.id,
                 message =
-                    throwable.message
-                        ?: "Não foi possível carregar as páginas."
+                    readableErrorMessage(
+                        throwable
+                    )
             )
 
             Log.e(
@@ -91,11 +121,19 @@ class ReaderChapterController(
             targetChapter
         )
 
+        val chapterState =
+            screenState.getChapterState(
+                targetChapter.id
+            )
+
+        if (
+            chapterState?.errorMessage != null
+        ) {
+            return
+        }
+
         val pages =
-            screenState
-                .getChapterState(
-                    targetChapter.id
-                )
+            chapterState
                 ?.pages
                 .orEmpty()
 
@@ -109,13 +147,17 @@ class ReaderChapterController(
             )
 
         screenState.updatePage(
-            chapterId = targetChapter.id,
-            pageIndex = safeTargetPage
+            chapterId =
+                targetChapter.id,
+            pageIndex =
+                safeTargetPage
         )
 
         screenState.requestPage(
-            chapterId = targetChapter.id,
-            pageIndex = safeTargetPage
+            chapterId =
+                targetChapter.id,
+            pageIndex =
+                safeTargetPage
         )
 
         if (!isLongStripMode) {
@@ -126,6 +168,21 @@ class ReaderChapterController(
                 targetChapter
             )
         }
+    }
+
+    private fun readableErrorMessage(
+        throwable: Throwable
+    ): String {
+        val originalMessage =
+            throwable.message
+                ?.trim()
+                .orEmpty()
+
+        if (originalMessage.isNotBlank()) {
+            return originalMessage
+        }
+
+        return "Verifique sua conexão e tente novamente."
     }
 
     private companion object {

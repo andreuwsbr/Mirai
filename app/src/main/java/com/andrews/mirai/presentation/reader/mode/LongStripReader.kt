@@ -1,6 +1,7 @@
 package com.andrews.mirai.presentation.reader.mode
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,9 +29,15 @@ import androidx.compose.ui.unit.dp
 import com.andrews.mirai.domain.model.Chapter
 import com.andrews.mirai.domain.model.ReaderPage
 import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
+import com.andrews.mirai.presentation.reader.components.ReaderChapterTransitionContent
 import com.andrews.mirai.presentation.reader.components.ReaderPageContent
+import com.andrews.mirai.presentation.reader.gesture.ReaderTapAction
+import com.andrews.mirai.presentation.reader.gesture.readerTapOverlay
 import com.andrews.mirai.presentation.reader.settings.ReaderMode
+import com.andrews.mirai.presentation.reader.settings.ReaderTapMode
+import com.andrews.mirai.presentation.reader.settings.ReaderTapZoneSize
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.rememberZoomableState
 import me.saket.telephoto.zoomable.zoomable
 import kotlin.math.abs
@@ -63,26 +71,30 @@ private sealed interface LongStripItem {
     data class Loading(
         val chapter: Chapter
     ) : LongStripItem {
-        override val key = "loading|${chapter.id}"
+        override val key =
+            "loading|${chapter.id}"
     }
 
     data class Error(
         val chapter: Chapter,
         val message: String
     ) : LongStripItem {
-        override val key = "error|${chapter.id}"
+        override val key =
+            "error|${chapter.id}"
     }
 
     data class Empty(
         val chapter: Chapter
     ) : LongStripItem {
-        override val key = "empty|${chapter.id}"
+        override val key =
+            "empty|${chapter.id}"
     }
 
     data class Finished(
         val chapter: Chapter
     ) : LongStripItem {
-        override val key = "finished|${chapter.id}"
+        override val key =
+            "finished|${chapter.id}"
     }
 }
 
@@ -91,6 +103,8 @@ internal fun LongStripReader(
     sections: List<LongStripChapterSection>,
     mode: ReaderMode,
     gapDp: Int,
+    tapMode: ReaderTapMode,
+    tapZoneSize: ReaderTapZoneSize,
     initialChapterId: String,
     initialPage: Int,
     requestedChapterId: String?,
@@ -105,118 +119,192 @@ internal fun LongStripReader(
     onRequestedPageConsumed: () -> Unit,
     onTap: () -> Unit
 ) {
-    val items = remember(
-        sections,
-        showFinalCompletion
-    ) {
-        buildList {
-            sections.forEachIndexed { index, section ->
-                if (index > 0) {
-                    add(
-                        LongStripItem.Transition(
-                            completedChapter =
-                                sections[index - 1].chapter,
-                            nextChapter = section.chapter
-                        )
-                    )
-                }
+    val items =
+        remember(
+            sections,
+            showFinalCompletion
+        ) {
+            buildList {
+                sections.forEachIndexed {
+                        index,
+                        section ->
 
-                when {
-                    section.isLoading -> {
+                    if (index > 0) {
                         add(
-                            LongStripItem.Loading(
-                                section.chapter
+                            LongStripItem.Transition(
+                                completedChapter =
+                                    sections[index - 1]
+                                        .chapter,
+                                nextChapter =
+                                    section.chapter
                             )
                         )
                     }
 
-                    section.errorMessage != null -> {
-                        add(
-                            LongStripItem.Error(
-                                chapter = section.chapter,
-                                message = section.errorMessage
-                            )
-                        )
-                    }
-
-                    section.pages.isEmpty() -> {
-                        add(
-                            LongStripItem.Empty(
-                                section.chapter
-                            )
-                        )
-                    }
-
-                    else -> {
-                        section.pages.forEach { page ->
+                    when {
+                        section.isLoading -> {
                             add(
-                                LongStripItem.Page(
-                                    chapter = section.chapter,
-                                    page = page
+                                LongStripItem.Loading(
+                                    section.chapter
                                 )
                             )
                         }
+
+                        section.errorMessage != null -> {
+                            add(
+                                LongStripItem.Error(
+                                    chapter =
+                                        section.chapter,
+                                    message =
+                                        section.errorMessage
+                                )
+                            )
+                        }
+
+                        section.pages.isEmpty() -> {
+                            add(
+                                LongStripItem.Empty(
+                                    section.chapter
+                                )
+                            )
+                        }
+
+                        else -> {
+                            section.pages.forEach {
+                                    page ->
+
+                                add(
+                                    LongStripItem.Page(
+                                        chapter =
+                                            section.chapter,
+                                        page =
+                                            page
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
-            }
 
-            val finalChapter = sections.lastOrNull()?.chapter
+                val finalChapter =
+                    sections
+                        .lastOrNull()
+                        ?.chapter
 
-            if (
-                showFinalCompletion &&
-                finalChapter != null
-            ) {
-                add(
-                    LongStripItem.Finished(
-                        finalChapter
+                if (
+                    showFinalCompletion &&
+                    finalChapter != null
+                ) {
+                    add(
+                        LongStripItem.Finished(
+                            finalChapter
+                        )
                     )
-                )
+                }
             }
+        }
+
+    val initialItemIndex =
+        remember(
+            items,
+            initialChapterId,
+            initialPage
+        ) {
+            items.indexOfFirst { item ->
+                item is LongStripItem.Page &&
+                        item.chapter.id ==
+                        initialChapterId &&
+                        item.page.index >=
+                        initialPage
+            }.coerceAtLeast(
+                0
+            )
+        }
+
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex =
+                initialItemIndex
+        )
+
+    val coroutineScope =
+        rememberCoroutineScope()
+
+    val zoomableState =
+        rememberZoomableState()
+
+    fun scrollOneScreen(
+        forward: Boolean
+    ) {
+        val viewportHeight =
+            listState
+                .layoutInfo
+                .viewportSize
+                .height
+                .toFloat()
+
+        if (viewportHeight <= 0f) {
+            return
+        }
+
+        val scrollDistance =
+            viewportHeight *
+                    SCREEN_SCROLL_FRACTION *
+                    if (forward) {
+                        1f
+                    } else {
+                        -1f
+                    }
+
+        coroutineScope.launch {
+            listState.animateScrollBy(
+                scrollDistance
+            )
         }
     }
 
-    val initialItemIndex = remember(
-        items,
-        initialChapterId,
-        initialPage
+    LaunchedEffect(
+        listState,
+        items
     ) {
-        items.indexOfFirst { item ->
-            item is LongStripItem.Page &&
-                    item.chapter.id == initialChapterId &&
-                    item.page.index >= initialPage
-        }.coerceAtLeast(0)
-    }
-
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = initialItemIndex
-    )
-
-    val zoomableState = rememberZoomableState()
-
-    LaunchedEffect(listState, items) {
         snapshotFlow {
-            val layoutInfo = listState.layoutInfo
+            val layoutInfo =
+                listState.layoutInfo
+
             val viewportCenter =
                 (
-                        layoutInfo.viewportStartOffset +
-                                layoutInfo.viewportEndOffset
+                        layoutInfo
+                            .viewportStartOffset +
+                                layoutInfo
+                                    .viewportEndOffset
                         ) / 2
 
-            layoutInfo.visibleItemsInfo
-                .mapNotNull { visibleItem ->
-                    val item = items.getOrNull(
-                        visibleItem.index
-                    )
+            layoutInfo
+                .visibleItemsInfo
+                .mapNotNull {
+                        visibleItem ->
 
-                    if (item is LongStripItem.Page) {
+                    val item =
+                        items.getOrNull(
+                            visibleItem.index
+                        )
+
+                    if (
+                        item is
+                                LongStripItem.Page
+                    ) {
                         val itemCenter =
                             visibleItem.offset +
-                                    visibleItem.size / 2
+                                    visibleItem.size /
+                                    2
 
                         Triple(
                             item.chapter,
                             item.page.index,
-                            abs(itemCenter - viewportCenter)
+                            abs(
+                                itemCenter -
+                                        viewportCenter
+                            )
                         )
                     } else {
                         null
@@ -226,7 +314,8 @@ internal fun LongStripReader(
                     value.third
                 }
                 ?.let { value ->
-                    value.first to value.second
+                    value.first to
+                            value.second
                 }
         }
             .distinctUntilChanged()
@@ -245,18 +334,25 @@ internal fun LongStripReader(
         requestedPage,
         items
     ) {
-        val chapterId = requestedChapterId
-        val pageIndex = requestedPage
+        val chapterId =
+            requestedChapterId
+
+        val pageIndex =
+            requestedPage
 
         if (
             chapterId != null &&
             pageIndex != null
         ) {
-            val targetIndex = items.indexOfFirst { item ->
-                item is LongStripItem.Page &&
-                        item.chapter.id == chapterId &&
-                        item.page.index >= pageIndex
-            }
+            val targetIndex =
+                items.indexOfFirst { item ->
+                    item is
+                            LongStripItem.Page &&
+                            item.chapter.id ==
+                            chapterId &&
+                            item.page.index >=
+                            pageIndex
+                }
 
             if (targetIndex >= 0) {
                 listState.animateScrollToItem(
@@ -269,19 +365,63 @@ internal fun LongStripReader(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clipToBounds()
-            .zoomable(
-                state = zoomableState,
-                onClick = {
-                    onTap()
-                }
-            )
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .clipToBounds()
+                .zoomable(
+                    state =
+                        zoomableState,
+                    onClick = {
+                        if (
+                            tapMode ==
+                            ReaderTapMode.SWIPE_ONLY
+                        ) {
+                            onTap()
+                        }
+                    }
+                )
+                .readerTapOverlay(
+                    enabled =
+                        tapMode ==
+                                ReaderTapMode
+                                    .TAP_AND_SWIPE,
+                    edgeFraction =
+                        tapZoneSize
+                            .edgeFraction,
+                    vertical =
+                        true,
+                    reverseReadingDirection =
+                        false,
+                    onAction = { action ->
+                        when (action) {
+                            ReaderTapAction
+                                .PREVIOUS_PAGE -> {
+                                scrollOneScreen(
+                                    forward = false
+                                )
+                            }
+
+                            ReaderTapAction
+                                .NEXT_PAGE -> {
+                                scrollOneScreen(
+                                    forward = true
+                                )
+                            }
+
+                            ReaderTapAction
+                                .TOGGLE_CONTROLS -> {
+                                onTap()
+                            }
+                        }
+                    }
+                )
     ) {
         LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
+            state =
+                listState,
+            modifier =
+                Modifier.fillMaxSize(),
             verticalArrangement =
                 if (
                     mode ==
@@ -295,29 +435,40 @@ internal fun LongStripReader(
                 }
         ) {
             items(
-                count = items.size,
+                count =
+                    items.size,
                 key = { index ->
                     items[index].key
                 }
             ) { index ->
-                when (val item = items[index]) {
+                when (
+                    val item =
+                        items[index]
+                ) {
                     is LongStripItem.Page -> {
                         ReaderPageContent(
-                            page = item.page,
+                            page =
+                                item.page,
                             imageDownloader =
                                 imageDownloader,
-                            paged = false,
+                            paged =
+                                false,
                             backgroundColor =
                                 backgroundColor,
-                            onTap = onTap
+                            /*
+                             * O toque da Tira longa agora é
+                             * controlado pelo overlay externo.
+                             */
+                            onTap = {}
                         )
                     }
 
                     is LongStripItem.Transition -> {
-                        ChapterTransitionContent(
+                        ReaderChapterTransitionContent(
                             completedChapter =
                                 item.completedChapter,
-                            nextChapter = item.nextChapter,
+                            nextChapter =
+                                item.nextChapter,
                             backgroundColor =
                                 backgroundColor
                         )
@@ -327,7 +478,8 @@ internal fun LongStripReader(
                         ChapterStatusContent(
                             text =
                                 "Carregando ${item.chapter.name}...",
-                            loading = true,
+                            loading =
+                                true,
                             backgroundColor =
                                 backgroundColor
                         )
@@ -335,8 +487,10 @@ internal fun LongStripReader(
 
                     is LongStripItem.Error -> {
                         ChapterStatusContent(
-                            text = item.message,
-                            loading = false,
+                            text =
+                                item.message,
+                            loading =
+                                false,
                             backgroundColor =
                                 backgroundColor
                         )
@@ -346,7 +500,8 @@ internal fun LongStripReader(
                         ChapterStatusContent(
                             text =
                                 "Nenhuma página foi encontrada em ${item.chapter.name}.",
-                            loading = false,
+                            loading =
+                                false,
                             backgroundColor =
                                 backgroundColor
                         )
@@ -354,7 +509,8 @@ internal fun LongStripReader(
 
                     is LongStripItem.Finished -> {
                         FinishedContent(
-                            chapter = item.chapter,
+                            chapter =
+                                item.chapter,
                             backgroundColor =
                                 backgroundColor
                         )
@@ -366,86 +522,56 @@ internal fun LongStripReader(
 }
 
 @Composable
-private fun ChapterTransitionContent(
-    completedChapter: Chapter,
-    nextChapter: Chapter,
-    backgroundColor: Color
-) {
-    val contentColor = contentColorFor(
-        backgroundColor
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 280.dp)
-            .background(backgroundColor)
-            .padding(
-                horizontal = 40.dp,
-                vertical = 48.dp
-            ),
-        verticalArrangement =
-            Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "Concluído:",
-            color = contentColor,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = completedChapter.name,
-            color = contentColor,
-            style = MaterialTheme.typography.headlineSmall
-        )
-
-        Text(
-            text = "Próximo:",
-            modifier = Modifier.padding(top = 28.dp),
-            color = contentColor,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = nextChapter.name,
-            color = contentColor,
-            style = MaterialTheme.typography.headlineSmall
-        )
-    }
-}
-
-@Composable
 private fun ChapterStatusContent(
     text: String,
     loading: Boolean,
     backgroundColor: Color
 ) {
-    val contentColor = contentColorFor(
-        backgroundColor
-    )
+    val contentColor =
+        contentColorFor(
+            backgroundColor
+        )
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 240.dp)
-            .background(backgroundColor)
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min = 240.dp
+                )
+                .background(
+                    backgroundColor
+                )
+                .padding(
+                    32.dp
+                ),
+        horizontalAlignment =
+            Alignment.CenterHorizontally,
+        verticalArrangement =
+            Arrangement.Center
     ) {
         if (loading) {
             CircularProgressIndicator()
         }
 
         Text(
-            text = text,
-            modifier = Modifier.padding(
-                top = if (loading) 16.dp else 0.dp
-            ),
-            color = contentColor,
-            style = MaterialTheme.typography.bodyLarge
+            text =
+                text,
+            modifier =
+                Modifier.padding(
+                    top =
+                        if (loading) {
+                            16.dp
+                        } else {
+                            0.dp
+                        }
+                ),
+            color =
+                contentColor,
+            style =
+                MaterialTheme
+                    .typography
+                    .bodyLarge
         )
     }
 }
@@ -455,30 +581,53 @@ private fun FinishedContent(
     chapter: Chapter,
     backgroundColor: Color
 ) {
-    val contentColor = contentColorFor(
-        backgroundColor
-    )
+    val contentColor =
+        contentColorFor(
+            backgroundColor
+        )
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 260.dp)
-            .background(backgroundColor)
-            .padding(40.dp),
-        verticalArrangement = Arrangement.Center
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(
+                    min = 260.dp
+                )
+                .background(
+                    backgroundColor
+                )
+                .padding(
+                    40.dp
+                ),
+        verticalArrangement =
+            Arrangement.Center
     ) {
         Text(
-            text = "Leitura concluída",
-            color = contentColor,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+            text =
+                "Leitura concluída",
+            color =
+                contentColor,
+            style =
+                MaterialTheme
+                    .typography
+                    .titleLarge,
+            fontWeight =
+                FontWeight.Bold
         )
 
         Text(
-            text = chapter.name,
-            modifier = Modifier.padding(top = 12.dp),
-            color = contentColor,
-            style = MaterialTheme.typography.headlineSmall
+            text =
+                chapter.name,
+            modifier =
+                Modifier.padding(
+                    top = 12.dp
+                ),
+            color =
+                contentColor,
+            style =
+                MaterialTheme
+                    .typography
+                    .headlineSmall
         )
     }
 }
@@ -486,9 +635,15 @@ private fun FinishedContent(
 private fun contentColorFor(
     backgroundColor: Color
 ): Color {
-    return if (backgroundColor.luminance() > 0.5f) {
+    return if (
+        backgroundColor.luminance() >
+        0.5f
+    ) {
         Color.Black
     } else {
         Color.White
     }
 }
+
+private const val SCREEN_SCROLL_FRACTION =
+    0.85f
