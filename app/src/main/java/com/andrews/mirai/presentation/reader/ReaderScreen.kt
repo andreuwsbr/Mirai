@@ -27,12 +27,12 @@ import com.andrews.mirai.presentation.reader.cache.ReaderImageDownloader
 import com.andrews.mirai.presentation.reader.components.ReaderErrorContent
 import com.andrews.mirai.presentation.reader.components.ReaderLoadingContent
 import com.andrews.mirai.presentation.reader.logic.ReaderChapterController
-import com.andrews.mirai.presentation.reader.logic.ReaderChapterNavigation
 import com.andrews.mirai.presentation.reader.logic.ReaderChapterPageLoader
 import com.andrews.mirai.presentation.reader.logic.ReaderLongStripMapper
 import com.andrews.mirai.presentation.reader.logic.ReaderPageProvider
 import com.andrews.mirai.presentation.reader.logic.ReaderPreloader
 import com.andrews.mirai.presentation.reader.progress.ReadingProgressStore
+import com.andrews.mirai.presentation.reader.session.ReaderSession
 import com.andrews.mirai.presentation.reader.settings.ReaderBackground
 import com.andrews.mirai.presentation.reader.settings.ReaderMode
 import com.andrews.mirai.presentation.reader.settings.ReaderSettingsSheet
@@ -63,13 +63,26 @@ fun ReaderScreen(
     val coroutineScope =
         rememberCoroutineScope()
 
-    val orderedChapters =
-        remember(chapters) {
-            ReaderChapterNavigation
-                .orderedChapters(
-                    chapters
-                )
+    /*
+     * Cria a lista cronológica usada pelo leitor.
+     *
+     * Essa lista será sempre organizada do capítulo
+     * menor para o maior, independentemente da ordem
+     * recebida da fonte ou da tela anterior.
+     */
+    val initialSession =
+        remember(
+            chapters,
+            chapter
+        ) {
+            ReaderSession.create(
+                chapters = chapters,
+                activeChapter = chapter
+            )
         }
+
+    val orderedChapters =
+        initialSession.chapters
 
     val progressStore =
         remember(applicationContext) {
@@ -159,19 +172,26 @@ fun ReaderScreen(
     val activeChapter =
         screenState.activeChapter
 
-    val previousChapter =
-        ReaderChapterNavigation
-            .previousChapter(
+    /*
+     * A sessão é atualizada sempre que o capítulo
+     * ativo ou a lista de capítulos mudar.
+     */
+    val readerSession =
+        remember(
+            orderedChapters,
+            activeChapter
+        ) {
+            ReaderSession(
                 chapters = orderedChapters,
-                chapter = activeChapter
+                activeChapter = activeChapter
             )
+        }
+
+    val previousChapter =
+        readerSession.previousChapter
 
     val nextChapter =
-        ReaderChapterNavigation
-            .nextChapter(
-                chapters = orderedChapters,
-                chapter = activeChapter
-            )
+        readerSession.nextChapter
 
     val activeState =
         screenState.getChapterState(
@@ -278,17 +298,17 @@ fun ReaderScreen(
         activeChapter.id,
         orderedChapters
     ) {
-        previousChapter?.let { chapter ->
+        previousChapter?.let { targetChapter ->
             chapterController
                 .loadChapterPages(
-                    chapter
+                    targetChapter
                 )
         }
 
-        nextChapter?.let { chapter ->
+        nextChapter?.let { targetChapter ->
             chapterController
                 .loadChapterPages(
-                    chapter
+                    targetChapter
                 )
         }
     }
@@ -327,10 +347,10 @@ fun ReaderScreen(
 
         val nextChapterPages =
             nextChapter
-                ?.let { chapter ->
+                ?.let { targetChapter ->
                     screenState
                         .getChapterState(
-                            chapter.id
+                            targetChapter.id
                         )
                         ?.pages
                 }
@@ -430,17 +450,26 @@ fun ReaderScreen(
                                 .activeChapter
                                 .id
                         ) {
+                            val previousActiveChapter =
+                                screenState.activeChapter
+
+                            /*
+                             * Usa a posição na sessão para saber
+                             * se avançou, em vez de comparar apenas
+                             * o número do capítulo.
+                             */
                             if (
-                                visibleChapter.number >
-                                screenState
-                                    .activeChapter
-                                    .number
+                                readerSession
+                                    .isForwardMovement(
+                                        fromChapter =
+                                            previousActiveChapter,
+                                        toChapter =
+                                            visibleChapter
+                                    )
                             ) {
                                 progressStore
                                     .markViewed(
-                                        screenState
-                                            .activeChapter
-                                            .id
+                                        previousActiveChapter.id
                                     )
                             }
 

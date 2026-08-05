@@ -32,9 +32,7 @@ fun MiraiReaderImage(
         },
         modifier = modifier,
         onClick = { _ ->
-            if (zoomEnabled) {
-                onTap()
-            }
+            onTap()
         }
     )
 }

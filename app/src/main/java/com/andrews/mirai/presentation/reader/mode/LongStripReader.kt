@@ -309,7 +309,7 @@ internal fun LongStripReader(
                             paged = false,
                             backgroundColor =
                                 backgroundColor,
-                            onTap = {}
+                            onTap = onTap
                         )
                     }
 
