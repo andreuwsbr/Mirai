@@ -261,12 +261,6 @@ fun ReaderScreen(
                 activePages
         )
 
-    val isLongStripMode =
-        preferences.mode ==
-                ReaderMode.LONG_STRIP ||
-                preferences.mode ==
-                ReaderMode.LONG_STRIP_GAPS
-
     val longStripState =
         remember(
             orderedChapters,
@@ -372,6 +366,14 @@ fun ReaderScreen(
         )
     }
 
+    /*
+     * Carrega somente o capítulo ativo.
+     *
+     * Isso evita que o carregamento antecipado
+     * do capítulo anterior ou próximo seja
+     * cancelado no meio da troca e deixe o estado
+     * preso eternamente em isLoading.
+     */
     LaunchedEffect(
         activeChapter.id
     ) {
@@ -379,31 +381,6 @@ fun ReaderScreen(
             .loadChapterPages(
                 activeChapter
             )
-    }
-
-    /*
-     * Mantém capítulo anterior e próximo prontos
-     * para troca rápida.
-     */
-    LaunchedEffect(
-        activeChapter.id,
-        orderedChapters
-    ) {
-        previousChapter
-            ?.let { targetChapter ->
-                chapterController
-                    .loadChapterPages(
-                        targetChapter
-                    )
-            }
-
-        nextChapter
-            ?.let { targetChapter ->
-                chapterController
-                    .loadChapterPages(
-                        targetChapter
-                    )
-            }
     }
 
     LaunchedEffect(
@@ -427,6 +404,11 @@ fun ReaderScreen(
         }
     }
 
+    /*
+     * O pré-carregamento de imagens continua ativo.
+     * Ele não altera o estado de carregamento dos
+     * capítulos e não interfere na troca.
+     */
     LaunchedEffect(
         activePages,
         currentPageIndex,
@@ -476,17 +458,8 @@ fun ReaderScreen(
                 .openChapterFromControls(
                     targetChapter =
                         targetChapter,
-
-                    /*
-                     * Int.MAX_VALUE será limitado para
-                     * a última página pelo controlador.
-                     */
                     targetPage =
-                        Int.MAX_VALUE,
-
-                    isLongStripMode =
-                        false,
-
+                        0,
                     onChapterSelected =
                         onChapterSelected
                 )
@@ -512,8 +485,6 @@ fun ReaderScreen(
                         targetChapter,
                     targetPage =
                         0,
-                    isLongStripMode =
-                        false,
                     onChapterSelected =
                         onChapterSelected
                 )
@@ -728,16 +699,7 @@ fun ReaderScreen(
                                     targetChapter =
                                         targetChapter,
                                     targetPage =
-                                        progressStore
-                                            .getPage(
-                                                chapterId =
-                                                    targetChapter
-                                                        .id,
-                                                sourceId =
-                                                    sourceId
-                                            ),
-                                    isLongStripMode =
-                                        isLongStripMode,
+                                        0,
                                     onChapterSelected =
                                         onChapterSelected
                                 )
@@ -760,16 +722,7 @@ fun ReaderScreen(
                                     targetChapter =
                                         targetChapter,
                                     targetPage =
-                                        progressStore
-                                            .getPage(
-                                                chapterId =
-                                                    targetChapter
-                                                        .id,
-                                                sourceId =
-                                                    sourceId
-                                            ),
-                                    isLongStripMode =
-                                        isLongStripMode,
+                                        0,
                                     onChapterSelected =
                                         onChapterSelected
                                 )

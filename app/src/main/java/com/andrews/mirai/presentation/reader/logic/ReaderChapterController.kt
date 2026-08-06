@@ -7,12 +7,9 @@ import com.andrews.mirai.presentation.reader.state.ReaderScreenState
 import kotlinx.coroutines.CancellationException
 
 class ReaderChapterController(
-    private val screenState:
-    ReaderScreenState,
-    private val pageLoader:
-    ReaderChapterPageLoader,
-    private val progressStore:
-    ReadingProgressStore
+    private val screenState: ReaderScreenState,
+    private val pageLoader: ReaderChapterPageLoader,
+    private val progressStore: ReadingProgressStore
 ) {
 
     suspend fun loadChapterPages(
@@ -114,59 +111,83 @@ class ReaderChapterController(
     suspend fun openChapterFromControls(
         targetChapter: Chapter,
         targetPage: Int,
-        isLongStripMode: Boolean,
         onChapterSelected: (Chapter) -> Unit
     ) {
-        loadChapterPages(
-            targetChapter
-        )
+        val chapterChangeStarted =
+            screenState.beginChapterChange()
 
-        val chapterState =
-            screenState.getChapterState(
-                targetChapter.id
-            )
-
-        if (
-            chapterState?.errorMessage != null
-        ) {
+        if (!chapterChangeStarted) {
             return
         }
 
-        val pages =
-            chapterState
-                ?.pages
-                .orEmpty()
-
-        val safeTargetPage =
-            targetPage.coerceIn(
-                minimumValue = 0,
-                maximumValue =
-                    pages
-                        .lastIndex
-                        .coerceAtLeast(0)
+        try {
+            screenState.updatePage(
+                chapterId =
+                    targetChapter.id,
+                pageIndex =
+                    targetPage
             )
 
-        screenState.updatePage(
-            chapterId =
-                targetChapter.id,
-            pageIndex =
-                safeTargetPage
-        )
-
-        screenState.requestPage(
-            chapterId =
-                targetChapter.id,
-            pageIndex =
-                safeTargetPage
-        )
-
-        if (!isLongStripMode) {
             screenState.activeChapter =
                 targetChapter
+
+            screenState.requestPage(
+                chapterId =
+                    targetChapter.id,
+                pageIndex =
+                    targetPage
+            )
 
             onChapterSelected(
                 targetChapter
             )
+
+            loadChapterPages(
+                targetChapter
+            )
+
+            val chapterState =
+                screenState.getChapterState(
+                    targetChapter.id
+                )
+
+            if (
+                chapterState?.errorMessage != null
+            ) {
+                return
+            }
+
+            val pages =
+                chapterState
+                    ?.pages
+                    .orEmpty()
+
+            val safeTargetPage =
+                targetPage.coerceIn(
+                    minimumValue = 0,
+                    maximumValue =
+                        pages
+                            .lastIndex
+                            .coerceAtLeast(
+                                0
+                            )
+                )
+
+            screenState.updatePage(
+                chapterId =
+                    targetChapter.id,
+                pageIndex =
+                    safeTargetPage
+            )
+
+            screenState.requestPage(
+                chapterId =
+                    targetChapter.id,
+                pageIndex =
+                    safeTargetPage
+            )
+        } finally {
+            screenState.finishChapterChange()
         }
     }
 

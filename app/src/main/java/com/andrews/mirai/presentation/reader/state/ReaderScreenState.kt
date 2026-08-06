@@ -29,9 +29,13 @@ class ReaderScreenState(
     )
         private set
 
-    var controlsVisible by mutableStateOf(true)
+    var controlsVisible by mutableStateOf(
+        true
+    )
 
-    var settingsVisible by mutableStateOf(false)
+    var settingsVisible by mutableStateOf(
+        false
+    )
 
     var requestedChapterId by mutableStateOf<String?>(
         null
@@ -43,17 +47,26 @@ class ReaderScreenState(
     )
         private set
 
+    var isChangingChapter by mutableStateOf(
+        false
+    )
+        private set
+
     fun getChapterState(
         chapterId: String
     ): ReaderChapterPagesState? {
-        return chapterStates[chapterId]
+        return chapterStates[
+            chapterId
+        ]
     }
 
     fun isLoadingOrLoaded(
         chapterId: String
     ): Boolean {
         val chapterState =
-            chapterStates[chapterId]
+            chapterStates[
+                chapterId
+            ]
 
         return chapterState?.isLoading == true ||
                 chapterState
@@ -134,13 +147,17 @@ class ReaderScreenState(
         pages: List<ReaderPage>
     ): Int {
         return (
-                pageByChapter[chapterId] ?: 0
+                pageByChapter[
+                    chapterId
+                ] ?: 0
                 ).coerceIn(
                 minimumValue = 0,
                 maximumValue =
                     pages
                         .lastIndex
-                        .coerceAtLeast(0)
+                        .coerceAtLeast(
+                            0
+                        )
             )
     }
 
@@ -156,8 +173,27 @@ class ReaderScreenState(
     }
 
     fun consumeRequestedPage() {
-        requestedChapterId = null
-        requestedPage = null
+        requestedChapterId =
+            null
+
+        requestedPage =
+            null
+    }
+
+    fun beginChapterChange(): Boolean {
+        if (isChangingChapter) {
+            return false
+        }
+
+        isChangingChapter =
+            true
+
+        return true
+    }
+
+    fun finishChapterChange() {
+        isChangingChapter =
+            false
     }
 
     fun toggleControls() {

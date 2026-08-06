@@ -174,14 +174,23 @@ fun MiraiApp() {
         )
     }
 
-    fun loadSavedMangaChapters(
+    fun openSavedChapter(
         chapter: Chapter,
         sourceId: String
     ) {
-        val source =
-            SourceRepository.currentSource
+        val sourceSelected =
+            SourceRepository.selectSource(
+                sourceId
+            )
+
+        if (!sourceSelected) {
+            return
+        }
 
         coroutineScope.launch {
+            val source =
+                SourceRepository.currentSource
+
             val loadedChapters =
                 try {
                     withContext(
@@ -199,8 +208,7 @@ fun MiraiApp() {
                         )
                     }
                 } catch (
-                    exception:
-                    CancellationException
+                    exception: CancellationException
                 ) {
                     throw exception
                 } catch (
@@ -209,61 +217,86 @@ fun MiraiApp() {
                     emptyList()
                 }
 
+            /*
+             * Primeiro tenta encontrar pelo ID, que é
+             * a forma mais segura.
+             */
+            val chapterById =
+                loadedChapters
+                    .firstOrNull { loadedChapter ->
+                        loadedChapter.id ==
+                                chapter.id
+                    }
+
+            /*
+             * Algumas fontes podem mudar o ID ou a URL.
+             * Nesse caso, usamos o número do capítulo.
+             */
+            val chapterByNumber =
+                loadedChapters
+                    .firstOrNull { loadedChapter ->
+                        loadedChapter.number.isFinite() &&
+                                chapter.number.isFinite() &&
+                                loadedChapter.number ==
+                                chapter.number
+                    }
+
+            /*
+             * Última tentativa: comparar o nome.
+             */
+            val chapterByName =
+                loadedChapters
+                    .firstOrNull { loadedChapter ->
+                        loadedChapter.name
+                            .trim()
+                            .equals(
+                                chapter.name.trim(),
+                                ignoreCase = true
+                            )
+                    }
+
+            val resolvedChapter =
+                chapterById
+                    ?: chapterByNumber
+                    ?: chapterByName
+                    ?: chapter
+
+            val readerChapters =
+                if (
+                    loadedChapters.isNotEmpty()
+                ) {
+                    loadedChapters
+                } else {
+                    listOf(
+                        resolvedChapter
+                    )
+                }
+
             val isSameSource =
                 SourceRepository
                     .currentSource
                     .id == sourceId
 
-            val isSameManga =
-                navigationViewModel
-                    .selectedChapter
-                    ?.mangaId ==
-                        chapter.mangaId
+            if (!isSameSource) {
+                return@launch
+            }
 
-            if (
-                isSameSource &&
-                isSameManga
+            navigationViewModel
+                .selectChapter(
+                    chapter =
+                        resolvedChapter,
+                    chapters =
+                        readerChapters
+                )
+
+            navController.navigate(
+                READER_ROUTE
             ) {
-                navigationViewModel
-                    .updateSelectedChapters(
-                        loadedChapters
-                    )
+                launchSingleTop =
+                    true
             }
         }
     }
-
-    fun openSavedChapter(
-        chapter: Chapter,
-        sourceId: String
-    ) {
-        val sourceSelected =
-            SourceRepository.selectSource(
-                sourceId
-            )
-
-        if (!sourceSelected) {
-            return
-        }
-
-        navigationViewModel
-            .selectChapter(
-                chapter = chapter,
-                chapters =
-                    emptyList()
-            )
-
-        navController.navigate(
-            READER_ROUTE
-        ) {
-            launchSingleTop = true
-        }
-
-        loadSavedMangaChapters(
-            chapter = chapter,
-            sourceId = sourceId
-        )
-    }
-
     fun updateHistoryForChapter(
         chapter: Chapter
     ) {

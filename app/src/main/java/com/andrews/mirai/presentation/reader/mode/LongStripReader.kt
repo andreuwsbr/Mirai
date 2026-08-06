@@ -355,7 +355,7 @@ internal fun LongStripReader(
                 }
 
             if (targetIndex >= 0) {
-                listState.animateScrollToItem(
+                listState.scrollToItem(
                     targetIndex
                 )
 
